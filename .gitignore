@@ -1,0 +1,15 @@
+# Build artifacts
+.build/
+*.xcodeproj
+*.xcworkspace
+*.app
+
+# macOS
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved
