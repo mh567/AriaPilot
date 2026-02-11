@@ -3,13 +3,32 @@
 *.xcodeproj
 *.xcworkspace
 *.app
+DerivedData/
+*.dSYM
+*.dSYM.zip
+
+# Release packages
+*.zip
+*.tar.gz
+*.dmg
 
 # macOS
 .DS_Store
 *.swp
 *.swo
 *~
+.Spotlight-V100
+.Trashes
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
 
 # Swift Package Manager
 .swiftpm/
 Package.resolved
+
+# IDE
+.vscode/
+.idea/
