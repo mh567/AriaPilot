@@ -15,7 +15,7 @@ class DownloadManager: ObservableObject {
     @AppStorage("rpcSecret") var rpcSecret = ""
 
     private var timer: Timer?
-    private let pageSize = 30
+    private let pageSize = 10
 
     var client: Aria2Client {
         Aria2Client(rpcURL: rpcURL, secret: rpcSecret)
