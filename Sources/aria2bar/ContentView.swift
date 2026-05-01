@@ -141,21 +141,40 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 80)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(manager.stoppedDownloads) { dl in
-                            DownloadRowView(download: dl)
-                                .environmentObject(manager)
-                            Divider().padding(.horizontal, 8)
-                        }
-                        if manager.hasMoreStopped {
-                            loadMoreButton
+                VStack(spacing: 0) {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(sortedStopped) { dl in
+                                DownloadRowView(download: dl)
+                                    .environmentObject(manager)
+                                Divider().padding(.horizontal, 8)
+                            }
+                            if manager.hasMoreStopped {
+                                loadMoreButton
+                            }
                         }
                     }
+                    .frame(maxHeight: 320)
+                    Divider()
+                    clearHistoryButton
                 }
-                .frame(maxHeight: 320)
             }
         }
+    }
+
+    private var sortedStopped: [Download] {
+        manager.stoppedDownloads.sorted { lhs, rhs in lhs.gid > rhs.gid }
+    }
+
+    private var clearHistoryButton: some View {
+        Button(role: .destructive) {
+            Task { await manager.clearHistory() }
+        } label: {
+            Text("Clear All")
+                .font(.caption)
+                .frame(maxWidth: .infinity, minHeight: 30)
+        }
+        .buttonStyle(.borderless)
     }
 
     private var loadMoreButton: some View {

@@ -79,4 +79,8 @@ struct Aria2Client {
     func removeResult(gid: String) async throws {
         let _: String = try await call(method: "aria2.removeDownloadResult", params: [.string(gid)])
     }
+
+    func purgeDownloadResult() async throws {
+        let _: String = try await call(method: "aria2.purgeDownloadResult")
+    }
 }

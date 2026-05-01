@@ -114,4 +114,15 @@ class DownloadManager: ObservableObject {
             }
         }
     }
+
+    func clearHistory() async {
+        do {
+            try await client.purgeDownloadResult()
+            stoppedDownloads = []
+            hasMoreStopped = false
+            await refresh()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
 }
