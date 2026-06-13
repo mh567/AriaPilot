@@ -1,5 +1,7 @@
 # aria2bar
 
+![aria2bar 产品预览](assets/aria2bar-hero.svg)
+
 aria2bar 是一个轻量级 macOS 菜单栏工具，用来查看和管理 aria2 下载任务。它通过 aria2 JSON RPC 连接到正在运行的 aria2 实例，适合希望把 aria2 常驻在后台，同时保留一个原生小面板来操作下载任务的用户。
 
 ## 功能
