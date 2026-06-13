@@ -1,77 +1,142 @@
 # aria2bar
 
-轻量级 macOS 菜单栏工具，用于监控和管理 aria2 下载任务。
+aria2bar 是一个轻量级 macOS 菜单栏工具，用来查看和管理 aria2 下载任务。它通过 aria2 JSON RPC 连接到正在运行的 aria2 实例，适合希望把 aria2 常驻在后台，同时保留一个原生小面板来操作下载任务的用户。
 
-## ✨ 特点
+## 功能
 
-- **原生体验**：纯 SwiftUI 开发，零外部依赖，轻量高效
-- **菜单栏常驻**：无 Dock 图标，不占用空间
-- **实时监控**：全局下载/上传速度一目了然
-- **任务管理**：分标签页查看正在下载和已完成任务
-- **完整控制**：添加、暂停、恢复、删除下载任务
-- **性能优秀**：已完成列表支持分页加载，处理大量任务无压力
-- **灵活配置**：支持自定义 RPC 地址和密钥
-- **开机自启**：可选开机自动启动
+### 菜单栏面板
 
-## 📦 安装使用
+菜单栏面板用于快速查看当前状态和执行高频操作：
 
-### 下载安装
+1. 查看全局下载和上传速度
+2. 查看下载中任务和已完成任务
+3. 添加下载链接
+4. 暂停、继续、删除任务
+5. 打开独立下载任务窗口
+6. 打开设置窗口
+7. 退出应用
 
-从 [Releases](https://github.com/mh567/aria2bar/releases) 下载最新版本，解压后拖入应用程序文件夹即可。
+### 独立下载任务窗口
 
-### 配置连接
+当任务较多时，可以从菜单栏点击“打开窗口”进入独立下载任务窗口。独立窗口支持正常拖拽调整大小，适合长时间管理任务列表。
 
-1. 确保 aria2 已启动并开启 RPC（默认端口 6800）
-2. 点击菜单栏图标打开面板
-3. 点击底部「Settings」配置连接信息：
-   - **RPC URL**: aria2 RPC 地址（默认 `http://localhost:6800/jsonrpc`）
-   - **Secret Token**: RPC 密钥（如有设置）
-   - **Launch at Login**: 开机自启动选项
+### 设置窗口
 
-## 🛠 开发构建
+设置窗口支持：
+
+1. 配置 RPC URL 和密钥
+2. 检测 aria2 连接并读取运行配置
+3. 设置新任务默认下载位置
+4. 设置同时下载任务数量
+5. 设置新任务连接数
+6. 设置全局下载和上传速度限制
+7. 配置登录时启动
+8. 检查并安装新版本
+
+说明：aria2bar 的“已完成”列表来自 aria2 RPC 的 `aria2.tellStopped`，它不会扫描下载目录。如果 aria2 没有保留历史结果，列表会显示为空。
+
+## 安装
+
+1. 打开 [Releases](https://github.com/mh567/aria2bar/releases)
+2. 下载最新的 `aria2bar-vx.x.x-macos.zip`
+3. 解压后把 `aria2bar.app` 拖入“应用程序”
+4. 启动 aria2bar
+5. 在设置窗口中配置 aria2 RPC
+
+## aria2 RPC 配置
+
+aria2bar 需要连接到已经开启 RPC 的 aria2。
+
+本机常见启动示例：
 
 ```bash
-# 调试构建
-swift build
+aria2c --enable-rpc --rpc-listen-all=false --rpc-listen-port=6800 --rpc-secret=123456
+```
 
-# 发布构建（生成 .app 包）
+对应的 aria2bar 设置：
+
+```text
+RPC URL: http://localhost:6800/jsonrpc
+密钥: 123456
+```
+
+如果 aria2 运行在局域网其他设备上，把 `localhost` 换成对应设备的 IP 地址。
+
+## 历史任务
+
+aria2bar 的已完成列表依赖 aria2 当前会话中保留的下载结果。若希望 aria2 重启后仍能恢复任务和历史，请根据自己的 aria2 使用方式配置 session 文件，例如：
+
+```bash
+aria2c \
+  --enable-rpc \
+  --rpc-secret=123456 \
+  --save-session=/path/to/aria2.session \
+  --input-file=/path/to/aria2.session \
+  --save-session-interval=60
+```
+
+如果配置了 `max-download-result=0`，aria2 不会保留已停止任务结果，aria2bar 的已完成列表也会为空。
+
+## 应用内更新
+
+设置窗口中提供“检查更新”和“立即更新”。更新来源为 GitHub Releases。下载完成后，aria2bar 会校验安装包中的 bundle id 和版本号，再替换当前应用并重新打开。
+
+## 开发构建
+
+调试构建：
+
+```bash
+swift build
+```
+
+发布构建：
+
+```bash
 bash build.sh
 ```
 
-## 📋 系统要求
+发布构建会生成：
 
-- macOS 13.0+
-- aria2 已安装并启用 RPC
-
-## 🔧 技术栈
-
-- **语言**: Swift 5.9+
-- **UI 框架**: 纯 SwiftUI
-- **依赖管理**: Swift Package Manager
-- **网络层**: URLSession + async/await
-- **协议**: JSON-RPC 2.0
-- **系统框架**: Foundation, ServiceManagement
-- **特性**:
-  - 零外部依赖
-  - 每 2 秒轮询刷新状态
-  - @AppStorage 持久化配置
-  - SMAppService 开机自启
-
-## 📂 项目结构
-
+```text
+aria2bar.app
+aria2bar-vx.x.x-macos.zip
 ```
+
+## 系统要求
+
+1. macOS 13.0 或更高版本
+2. aria2 已安装并开启 RPC
+3. Swift 5.9 或更高版本，用于本地开发构建
+
+## 项目结构
+
+```text
 Sources/aria2bar/
-├── aria2barApp.swift       # 应用入口
-├── Models.swift            # 数据模型
-├── Aria2Client.swift       # JSON-RPC 客户端
-├── DownloadManager.swift   # 状态管理
-├── ContentView.swift       # 主界面
-├── DownloadRowView.swift   # 任务列表项
-├── AddDownloadView.swift   # 添加下载
-├── SettingsView.swift      # 设置页面
-└── Helpers.swift           # 工具函数
+├── aria2barApp.swift
+├── ContentView.swift
+├── DownloadsWindowView.swift
+├── DownloadsWindowController.swift
+├── DownloadsListView.swift
+├── SettingsView.swift
+├── SettingsWindowController.swift
+├── AddDownloadView.swift
+├── DownloadRowView.swift
+├── DownloadManager.swift
+├── Aria2Client.swift
+├── UpdateManager.swift
+├── Models.swift
+└── Helpers.swift
 ```
 
-## 📄 许可证
+## 技术栈
+
+1. Swift
+2. SwiftUI
+3. Swift Package Manager
+4. URLSession
+5. aria2 JSON RPC
+6. ServiceManagement
+
+## 许可证
 
 MIT
