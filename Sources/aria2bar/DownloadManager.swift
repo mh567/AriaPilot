@@ -13,6 +13,12 @@ class DownloadManager: ObservableObject {
 
     @AppStorage("rpcURL") var rpcURL = "http://localhost:6800/jsonrpc"
     @AppStorage("rpcSecret") var rpcSecret = ""
+    @AppStorage("downloadDirectory") var downloadDirectory = ""
+    @AppStorage("maxConcurrentDownloads") var maxConcurrentDownloads = 5
+    @AppStorage("connectionsPerDownload") var connectionsPerDownload = 5
+    @AppStorage("downloadSpeedLimit") var downloadSpeedLimit = "0"
+    @AppStorage("uploadSpeedLimit") var uploadSpeedLimit = "0"
+    @AppStorage("hasSavedDownloadSettings") var hasSavedDownloadSettings = false
 
     private var timer: Timer?
     private let pageSize = 10
@@ -26,7 +32,13 @@ class DownloadManager: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             Task { await self?.refresh() }
         }
-        Task { await refresh() }
+        Task {
+            if hasSavedDownloadSettings {
+                await applyGlobalOptions()
+            } else {
+                await refresh()
+            }
+        }
     }
 
     func stopPolling() {
@@ -76,7 +88,17 @@ class DownloadManager: ObservableObject {
 
     func addDownload(url: String) async {
         do {
-            try await client.addUri(url)
+            try await client.addUri(url, options: defaultDownloadOptions)
+            await refresh()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func applyGlobalOptions() async {
+        do {
+            try await client.changeGlobalOption(globalOptions)
+            error = nil
             await refresh()
         } catch {
             self.error = error.localizedDescription
@@ -124,5 +146,30 @@ class DownloadManager: ObservableObject {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    private var defaultDownloadOptions: [String: String] {
+        var options: [String: String] = [
+            "split": "\(connectionsPerDownload)",
+            "max-connection-per-server": "\(connectionsPerDownload)"
+        ]
+        let dir = downloadDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !dir.isEmpty {
+            options["dir"] = dir
+        }
+        return options
+    }
+
+    private var globalOptions: [String: String] {
+        [
+            "max-concurrent-downloads": "\(maxConcurrentDownloads)",
+            "max-overall-download-limit": normalizedSpeedLimit(downloadSpeedLimit),
+            "max-overall-upload-limit": normalizedSpeedLimit(uploadSpeedLimit)
+        ]
+    }
+
+    private func normalizedSpeedLimit(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "0" : trimmed
     }
 }

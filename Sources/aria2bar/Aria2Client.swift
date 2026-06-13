@@ -60,8 +60,20 @@ struct Aria2Client {
     // MARK: - Actions
 
     @discardableResult
-    func addUri(_ uri: String) async throws -> String {
-        try await call(method: "aria2.addUri", params: [.arrayOfStrings([[uri]])])
+    func addUri(_ uri: String, options: [String: String] = [:]) async throws -> String {
+        var params: [RPCParam] = [.arrayOfStrings([[uri]])]
+        if !options.isEmpty {
+            params.append(.options(options))
+        }
+        return try await call(method: "aria2.addUri", params: params)
+    }
+
+    func changeGlobalOption(_ options: [String: String]) async throws {
+        guard !options.isEmpty else { return }
+        let _: String = try await call(
+            method: "aria2.changeGlobalOption",
+            params: [.options(options)]
+        )
     }
 
     func pause(gid: String) async throws {

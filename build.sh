@@ -2,10 +2,13 @@
 set -e
 
 APP_NAME="aria2bar"
+APP_VERSION="1.2.0"
+BUILD_NUMBER="120"
 BUILD_DIR=".build/release"
 APP_BUNDLE="$APP_NAME.app"
 CONTENTS="$APP_BUNDLE/Contents"
 MACOS="$CONTENTS/MacOS"
+ZIP_NAME="$APP_NAME-v$APP_VERSION-macos.zip"
 
 echo "Building release..."
 swift build -c release 2>&1
@@ -16,7 +19,7 @@ mkdir -p "$MACOS"
 
 cp "$BUILD_DIR/$APP_NAME" "$MACOS/$APP_NAME"
 
-cat > "$CONTENTS/Info.plist" << 'EOF'
+cat > "$CONTENTS/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -28,15 +31,17 @@ cat > "$CONTENTS/Info.plist" << 'EOF'
 	<key>CFBundleIdentifier</key>
 	<string>com.aria2bar.app</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$BUILD_NUMBER</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$APP_VERSION</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleExecutable</key>
 	<string>aria2bar</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>aria2bar connects to the local aria2 RPC service.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
@@ -46,5 +51,14 @@ cat > "$CONTENTS/Info.plist" << 'EOF'
 </plist>
 EOF
 
+if command -v codesign >/dev/null 2>&1; then
+    codesign --force --deep --sign - "$APP_BUNDLE" >/dev/null 2>&1 || true
+fi
+
+echo "Creating release zip..."
+rm -f "$ZIP_NAME"
+ditto -c -k --keepParent "$APP_BUNDLE" "$ZIP_NAME"
+
 echo "Done: $APP_BUNDLE"
+echo "Package: $ZIP_NAME"
 echo "Run with: open $APP_BUNDLE"

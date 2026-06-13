@@ -7,6 +7,7 @@ enum RPCParam: Encodable {
     case int(Int)
     case strings([String])
     case arrayOfStrings([[String]])
+    case options([String: String])
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
@@ -15,6 +16,7 @@ enum RPCParam: Encodable {
         case .int(let v): try container.encode(v)
         case .strings(let v): try container.encode(v)
         case .arrayOfStrings(let v): try container.encode(v)
+        case .options(let v): try container.encode(v)
         }
     }
 }
