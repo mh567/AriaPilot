@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var downloadSpeedLimit = ""
     @State private var uploadSpeedLimit = ""
     @State private var launchAtLogin = false
+    @State private var validationError: String?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -21,21 +22,25 @@ struct SettingsView: View {
                 .font(.headline)
 
             ScrollView {
-                VStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 16) {
                     connectionSection
-                    Divider()
                     downloadSection
-                    Divider()
                     speedSection
-                    Divider()
-                    Toggle("Launch at Login", isOn: $launchAtLogin)
-                        .font(.caption)
-                        .onChange(of: launchAtLogin, perform: setLaunchAtLogin)
-                    Divider()
+                    startupSection
                     updateSection
                 }
             }
-            .frame(maxHeight: 420)
+            .frame(maxHeight: 520)
+
+            if let validationError {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text(validationError)
+                    Spacer()
+                }
+                .font(.caption2)
+                .foregroundStyle(.red)
+            }
 
             HStack {
                 Button("Cancel") { page = .main }
@@ -62,6 +67,8 @@ struct SettingsView: View {
 
     private var connectionSection: some View {
         VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("Connection")
+
             fieldLabel("RPC URL")
             TextField("http://localhost:6800/jsonrpc", text: $rpcURL)
                 .textFieldStyle(.roundedBorder)
@@ -74,10 +81,14 @@ struct SettingsView: View {
 
     private var downloadSection: some View {
         VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("Download")
+
             fieldLabel("Download Location")
-            HStack(spacing: 6) {
-                TextField("Use aria2 default", text: $downloadDirectory)
-                    .textFieldStyle(.roundedBorder)
+            TextField("Use aria2 default", text: $downloadDirectory)
+                .textFieldStyle(.roundedBorder)
+            HStack {
+                helperText("Default folder for newly added downloads.")
+                Spacer()
                 Button("Choose") {
                     chooseDownloadDirectory()
                 }
@@ -101,6 +112,8 @@ struct SettingsView: View {
 
     private var speedSection: some View {
         VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("Speed Limits")
+
             fieldLabel("Global Download Limit")
             TextField("0, 500K, 2M", text: $downloadSpeedLimit)
                 .textFieldStyle(.roundedBorder)
@@ -108,12 +121,25 @@ struct SettingsView: View {
             fieldLabel("Global Upload Limit")
             TextField("0, 500K, 2M", text: $uploadSpeedLimit)
                 .textFieldStyle(.roundedBorder)
+
+            helperText("Use 0 for unlimited. Examples: 500K, 2M.")
+        }
+    }
+
+    private var startupSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("Startup")
+
+            Toggle("Launch at Login", isOn: $launchAtLogin)
+                .font(.caption)
+                .onChange(of: launchAtLogin, perform: setLaunchAtLogin)
         }
     }
 
     private var updateSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            fieldLabel("Updates")
+            sectionHeader("Updates")
+
             HStack {
                 Text("Current Version: \(updateManager.currentVersion)")
                     .font(.caption)
@@ -144,9 +170,22 @@ struct SettingsView: View {
         }
     }
 
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption)
+            .fontWeight(.semibold)
+            .foregroundStyle(.primary)
+    }
+
     private func fieldLabel(_ title: String) -> some View {
         Text(title)
             .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private func helperText(_ text: String) -> some View {
+        Text(text)
+            .font(.caption2)
             .foregroundStyle(.secondary)
     }
 
@@ -208,6 +247,13 @@ struct SettingsView: View {
     }
 
     private func save() {
+        validationError = nil
+        guard isValidSpeedLimit(downloadSpeedLimit),
+              isValidSpeedLimit(uploadSpeedLimit) else {
+            validationError = "Speed limits must be 0 or values like 500K and 2M."
+            return
+        }
+
         manager.rpcURL = rpcURL.trimmingCharacters(in: .whitespacesAndNewlines)
         manager.rpcSecret = rpcSecret
         manager.downloadDirectory = downloadDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -221,6 +267,19 @@ struct SettingsView: View {
             await manager.applyGlobalOptions()
             page = .main
         }
+    }
+
+    private func isValidSpeedLimit(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return true }
+        let unit = trimmed.last?.uppercased()
+        let numberPart: Substring
+        if unit == "K" || unit == "M" {
+            numberPart = trimmed.dropLast()
+        } else {
+            numberPart = Substring(trimmed)
+        }
+        return Int(numberPart).map { $0 >= 0 } ?? false
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {

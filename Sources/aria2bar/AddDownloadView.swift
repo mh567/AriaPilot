@@ -13,6 +13,17 @@ struct AddDownloadView: View {
             TextField("URL", text: $url)
                 .textFieldStyle(.roundedBorder)
 
+            HStack(spacing: 6) {
+                Image(systemName: "folder")
+                    .foregroundStyle(.secondary)
+                Text("Save to: \(downloadLocation)")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+
             HStack {
                 Button("Cancel") { page = .main }
                     .keyboardShortcut(.cancelAction)
@@ -30,5 +41,10 @@ struct AddDownloadView: View {
             }
         }
         .padding()
+    }
+
+    private var downloadLocation: String {
+        let dir = manager.downloadDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        return dir.isEmpty ? "aria2 default" : dir
     }
 }

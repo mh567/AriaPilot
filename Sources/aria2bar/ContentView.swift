@@ -26,7 +26,7 @@ struct ContentView: View {
                     .environmentObject(manager)
             }
         }
-        .frame(width: 360)
+        .frame(width: 420)
         .onAppear { manager.startPolling() }
         .onDisappear { manager.stopPolling() }
     }
@@ -35,6 +35,10 @@ struct ContentView: View {
         VStack(spacing: 0) {
             headerBar
             Divider()
+            if let error = manager.error {
+                errorBanner(error)
+                Divider()
+            }
             tabBar
             Divider()
             tabContent
@@ -162,6 +166,21 @@ struct ContentView: View {
         }
     }
 
+    private func errorBanner(_ message: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+            Text(message)
+                .lineLimit(2)
+                .truncationMode(.tail)
+            Spacer()
+        }
+        .font(.caption2)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.red.opacity(0.08))
+    }
+
     private var sortedStopped: [Download] {
         manager.stoppedDownloads.sorted { lhs, rhs in lhs.gid > rhs.gid }
     }
@@ -201,14 +220,6 @@ struct ContentView: View {
             }
             .buttonStyle(.borderless)
             Spacer()
-            if let err = manager.error {
-                Text(err)
-                    .font(.caption2)
-                    .foregroundStyle(.red)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Spacer()
-            }
             Button { page = .settings } label: {
                 Label("Settings", systemImage: "gearshape")
             }
