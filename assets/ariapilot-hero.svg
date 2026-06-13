@@ -15,7 +15,7 @@
 
   <rect width="1600" height="900" rx="0" fill="url(#bg)"/>
 
-  <text x="104" y="108" fill="#0f172a" font-family="-apple-system, BlinkMacSystemFont, SF Pro Display, Segoe UI, sans-serif" font-size="54" font-weight="700">aria2bar</text>
+  <text x="104" y="108" fill="#0f172a" font-family="-apple-system, BlinkMacSystemFont, SF Pro Display, Segoe UI, sans-serif" font-size="54" font-weight="700">AriaPilot</text>
   <text x="106" y="154" fill="#64748b" font-family="-apple-system, BlinkMacSystemFont, SF Pro Text, Segoe UI, sans-serif" font-size="24">轻量级 macOS 菜单栏 aria2 下载管理工具</text>
 
   <g transform="translate(92 214)" filter="url(#shadow)">
@@ -69,7 +69,7 @@
     <circle cx="30" cy="27" r="7" fill="#ef4444"/>
     <circle cx="54" cy="27" r="7" fill="#f59e0b"/>
     <circle cx="78" cy="27" r="7" fill="#22c55e"/>
-    <text x="360" y="35" fill="#0f172a" font-family="-apple-system, BlinkMacSystemFont, SF Pro Display, Segoe UI, sans-serif" font-size="20" font-weight="600">aria2bar 下载任务</text>
+    <text x="360" y="35" fill="#0f172a" font-family="-apple-system, BlinkMacSystemFont, SF Pro Display, Segoe UI, sans-serif" font-size="20" font-weight="600">AriaPilot 下载任务</text>
     <line x1="0" y1="54" x2="890" y2="54" stroke="#e2e8f0"/>
 
     <g transform="translate(22 70)">

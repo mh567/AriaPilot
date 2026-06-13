@@ -1,8 +1,8 @@
-# aria2bar
+# AriaPilot
 
-![aria2bar 产品预览](assets/aria2bar-hero.svg)
+![AriaPilot 产品预览](assets/ariapilot-hero.svg)
 
-aria2bar 是一个轻量级 macOS 菜单栏工具，用来查看和管理 aria2 下载任务。它通过 aria2 JSON RPC 连接到正在运行的 aria2 实例，适合希望把 aria2 常驻在后台，同时保留一个原生小面板来操作下载任务的用户。
+AriaPilot 是一个轻量级 macOS 菜单栏工具，用来查看和管理 aria2 下载任务。它通过 aria2 JSON RPC 连接到正在运行的 aria2 实例，适合希望把 aria2 常驻在后台，同时保留一个原生小面板来操作下载任务的用户。
 
 ## 功能
 
@@ -35,19 +35,19 @@ aria2bar 是一个轻量级 macOS 菜单栏工具，用来查看和管理 aria2 
 7. 配置登录时启动
 8. 检查并安装新版本
 
-说明：aria2bar 的“已完成”列表来自 aria2 RPC 的 `aria2.tellStopped`，它不会扫描下载目录。如果 aria2 没有保留历史结果，列表会显示为空。
+说明：AriaPilot 的“已完成”列表来自 aria2 RPC 的 `aria2.tellStopped`，它不会扫描下载目录。如果 aria2 没有保留历史结果，列表会显示为空。
 
 ## 安装
 
-1. 打开 [Releases](https://github.com/mh567/aria2bar/releases)
-2. 下载最新的 `aria2bar-vx.x.x-macos.zip`
-3. 解压后把 `aria2bar.app` 拖入“应用程序”
-4. 启动 aria2bar
+1. 打开 [Releases](https://github.com/mh567/AriaPilot/releases)
+2. 下载最新的 `AriaPilot-vx.x.x-macos.zip`
+3. 解压后把 `AriaPilot.app` 拖入“应用程序”
+4. 启动 AriaPilot
 5. 在设置窗口中配置 aria2 RPC
 
 ## aria2 RPC 配置
 
-aria2bar 需要连接到已经开启 RPC 的 aria2。
+AriaPilot 需要连接到已经开启 RPC 的 aria2。
 
 本机常见启动示例：
 
@@ -55,7 +55,7 @@ aria2bar 需要连接到已经开启 RPC 的 aria2。
 aria2c --enable-rpc --rpc-listen-all=false --rpc-listen-port=6800 --rpc-secret=123456
 ```
 
-对应的 aria2bar 设置：
+对应的 AriaPilot 设置：
 
 ```text
 RPC URL: http://localhost:6800/jsonrpc
@@ -66,7 +66,7 @@ RPC URL: http://localhost:6800/jsonrpc
 
 ## 历史任务
 
-aria2bar 的已完成列表依赖 aria2 当前会话中保留的下载结果。若希望 aria2 重启后仍能恢复任务和历史，请根据自己的 aria2 使用方式配置 session 文件，例如：
+AriaPilot 的已完成列表依赖 aria2 当前会话中保留的下载结果。若希望 aria2 重启后仍能恢复任务和历史，请根据自己的 aria2 使用方式配置 session 文件，例如：
 
 ```bash
 aria2c \
@@ -77,11 +77,11 @@ aria2c \
   --save-session-interval=60
 ```
 
-如果配置了 `max-download-result=0`，aria2 不会保留已停止任务结果，aria2bar 的已完成列表也会为空。
+如果配置了 `max-download-result=0`，aria2 不会保留已停止任务结果，AriaPilot 的已完成列表也会为空。
 
 ## 应用内更新
 
-设置窗口中提供“检查更新”和“立即更新”。更新来源为 GitHub Releases。下载完成后，aria2bar 会校验安装包中的 bundle id 和版本号，再替换当前应用并重新打开。
+设置窗口中提供“检查更新”和“立即更新”。更新来源为 GitHub Releases。下载完成后，AriaPilot 会校验安装包中的 bundle id 和版本号，再替换当前应用并重新打开。
 
 ## 开发构建
 
@@ -100,8 +100,8 @@ bash build.sh
 发布构建会生成：
 
 ```text
-aria2bar.app
-aria2bar-vx.x.x-macos.zip
+AriaPilot.app
+AriaPilot-vx.x.x-macos.zip
 ```
 
 ## 系统要求
@@ -113,8 +113,8 @@ aria2bar-vx.x.x-macos.zip
 ## 项目结构
 
 ```text
-Sources/aria2bar/
-├── aria2barApp.swift
+Sources/AriaPilot/
+├── AriaPilotApp.swift
 ├── ContentView.swift
 ├── DownloadsWindowView.swift
 ├── DownloadsWindowController.swift

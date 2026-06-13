@@ -23,7 +23,7 @@ enum RPCParam: Encodable {
 
 struct RPCRequest: Encodable {
     let jsonrpc = "2.0"
-    let id = "aria2bar"
+    let id = "AriaPilot"
     let method: String
     let params: [RPCParam]
 }

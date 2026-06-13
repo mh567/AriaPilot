@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-APP_NAME="aria2bar"
-APP_VERSION="1.3.0"
-BUILD_NUMBER="130"
+APP_NAME="AriaPilot"
+APP_VERSION="1.4.0"
+BUILD_NUMBER="140"
 BUILD_DIR=".build/release"
 APP_BUNDLE="$APP_NAME.app"
 CONTENTS="$APP_BUNDLE/Contents"
@@ -25,11 +25,11 @@ cat > "$CONTENTS/Info.plist" << EOF
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>aria2bar</string>
+	<string>AriaPilot</string>
 	<key>CFBundleDisplayName</key>
-	<string>aria2bar</string>
+	<string>AriaPilot</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.aria2bar.app</string>
+	<string>com.ariapilot.app</string>
 	<key>CFBundleVersion</key>
 	<string>$BUILD_NUMBER</string>
 	<key>CFBundleShortVersionString</key>
@@ -37,11 +37,11 @@ cat > "$CONTENTS/Info.plist" << EOF
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleExecutable</key>
-	<string>aria2bar</string>
+	<string>AriaPilot</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>aria2bar 需要连接本机 aria2 RPC 服务。</string>
+	<string>AriaPilot 需要连接本机 aria2 RPC 服务。</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

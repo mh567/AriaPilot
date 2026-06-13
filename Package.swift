@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "aria2bar",
+    name: "AriaPilot",
     platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
-            name: "aria2bar",
-            path: "Sources/aria2bar"
+            name: "AriaPilot",
+            path: "Sources/AriaPilot"
         )
     ]
 )

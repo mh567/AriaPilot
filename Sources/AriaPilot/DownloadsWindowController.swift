@@ -24,7 +24,7 @@ final class DownloadsWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        downloadsWindow.title = "aria2bar 下载任务"
+        downloadsWindow.title = "AriaPilot 下载任务"
         downloadsWindow.contentViewController = NSHostingController(rootView: view)
         downloadsWindow.delegate = self
         downloadsWindow.isReleasedWhenClosed = false

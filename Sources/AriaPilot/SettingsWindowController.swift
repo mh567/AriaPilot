@@ -27,7 +27,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        settingsWindow.title = "aria2bar 设置"
+        settingsWindow.title = "AriaPilot 设置"
         settingsWindow.contentViewController = NSHostingController(rootView: view)
         settingsWindow.delegate = self
         settingsWindow.isReleasedWhenClosed = false

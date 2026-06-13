@@ -18,7 +18,7 @@ final class UpdateManager: ObservableObject {
     var currentVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.2.0"
+        ) as? String ?? "1.4.0"
     }
 
     func checkForUpdates() async {
@@ -56,9 +56,9 @@ final class UpdateManager: ObservableObject {
     }
 
     private func fetchLatestRelease() async throws -> ReleaseInfo {
-        let url = URL(string: "https://api.github.com/repos/mh567/aria2bar/releases/latest")!
+        let url = URL(string: "https://api.github.com/repos/mh567/AriaPilot/releases/latest")!
         var request = URLRequest(url: url)
-        request.setValue("aria2bar", forHTTPHeaderField: "User-Agent")
+        request.setValue("AriaPilot", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse,
@@ -92,7 +92,7 @@ final class UpdateManager: ObservableObject {
         }
 
         let destination = FileManager.default.temporaryDirectory
-            .appendingPathComponent("aria2bar-update-\(UUID().uuidString)")
+            .appendingPathComponent("AriaPilot-update-\(UUID().uuidString)")
             .appendingPathExtension("zip")
         try FileManager.default.moveItem(at: temporaryURL, to: destination)
         return destination
@@ -100,7 +100,7 @@ final class UpdateManager: ObservableObject {
 
     private func extractPackage(_ packageURL: URL) async throws -> URL {
         let destination = FileManager.default.temporaryDirectory
-            .appendingPathComponent("aria2bar-update-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("AriaPilot-update-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(
             at: destination,
             withIntermediateDirectories: true
@@ -110,7 +110,7 @@ final class UpdateManager: ObservableObject {
 
         let paths = try FileManager.default.subpathsOfDirectory(atPath: destination.path)
         for path in paths {
-            if path.hasSuffix("aria2bar.app") {
+            if path.hasSuffix("AriaPilot.app") {
                 let appURL = destination.appendingPathComponent(path, isDirectory: true)
                 var isDirectory: ObjCBool = false
                 if FileManager.default.fileExists(
@@ -133,7 +133,7 @@ final class UpdateManager: ObservableObject {
             throw UpdateError.invalidPackage
         }
 
-        guard bundleID == "com.aria2bar.app",
+        guard bundleID == "com.ariapilot.app",
               Version(version) == Version(release.version),
               Version(version) > Version(currentVersion) else {
             throw UpdateError.invalidPackage
@@ -143,7 +143,7 @@ final class UpdateManager: ObservableObject {
     private func launchInstaller(with newAppURL: URL) throws {
         let currentAppURL = Bundle.main.bundleURL
         let scriptURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("aria2bar-install-\(UUID().uuidString).sh")
+            .appendingPathComponent("AriaPilot-install-\(UUID().uuidString).sh")
 
         let script = """
         #!/bin/bash
@@ -291,7 +291,7 @@ private enum UpdateError: LocalizedError {
         case .packageMissing:
             return "最新版本中没有找到 macOS 安装包。"
         case .extractedAppMissing:
-            return "下载的安装包中没有 aria2bar.app。"
+            return "下载的安装包中没有 AriaPilot.app。"
         case .invalidPackage:
             return "下载的 app 安装包未通过校验。"
         case .processFailed(let message):

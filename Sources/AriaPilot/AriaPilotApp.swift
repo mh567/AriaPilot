@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct aria2barApp: App {
+struct AriaPilotApp: App {
     @StateObject private var manager = DownloadManager()
 
     var body: some Scene {
@@ -9,7 +9,7 @@ struct aria2barApp: App {
             ContentView()
                 .environmentObject(manager)
         } label: {
-            Label("aria2bar", systemImage: "arrow.down.circle")
+            Label("AriaPilot", systemImage: "arrow.down.circle")
         }
         .menuBarExtraStyle(.window)
     }
