@@ -2,13 +2,15 @@
 set -e
 
 APP_NAME="AriaPilot"
-APP_VERSION="1.4.0"
-BUILD_NUMBER="140"
+APP_VERSION="1.4.1"
+BUILD_NUMBER="141"
 BUILD_DIR=".build/release"
 APP_BUNDLE="$APP_NAME.app"
 CONTENTS="$APP_BUNDLE/Contents"
 MACOS="$CONTENTS/MacOS"
+RESOURCES="$CONTENTS/Resources"
 ZIP_NAME="$APP_NAME-v$APP_VERSION-macos.zip"
+ICON_FILE="assets/AppIcon.icns"
 
 echo "Building release..."
 swift build -c release 2>&1
@@ -16,8 +18,14 @@ swift build -c release 2>&1
 echo "Creating app bundle..."
 rm -rf "$APP_BUNDLE"
 mkdir -p "$MACOS"
+mkdir -p "$RESOURCES"
 
 cp "$BUILD_DIR/$APP_NAME" "$MACOS/$APP_NAME"
+if [ ! -f "$ICON_FILE" ]; then
+    echo "Missing app icon: $ICON_FILE" >&2
+    exit 1
+fi
+cp "$ICON_FILE" "$RESOURCES/AppIcon.icns"
 
 cat > "$CONTENTS/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -38,6 +46,8 @@ cat > "$CONTENTS/Info.plist" << EOF
 	<string>APPL</string>
 	<key>CFBundleExecutable</key>
 	<string>AriaPilot</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
