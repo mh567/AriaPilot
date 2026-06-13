@@ -20,7 +20,6 @@ struct ContentView: View {
             }
         }
         .frame(width: 420)
-        .onAppear { manager.startPolling() }
     }
 
     private var mainView: some View {

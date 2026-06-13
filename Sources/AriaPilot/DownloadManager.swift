@@ -10,6 +10,7 @@ class DownloadManager: ObservableObject {
     @Published var error: String?
     @Published var hasMoreStopped = false
     @Published var isLoadingMore = false
+    @Published private(set) var menuBarStatus: MenuBarStatus = .idle
 
     @AppStorage("rpcURL") var rpcURL = "http://localhost:6800/jsonrpc"
     @AppStorage("rpcSecret") var rpcSecret = ""
@@ -25,6 +26,26 @@ class DownloadManager: ObservableObject {
 
     var client: Aria2Client {
         Aria2Client(rpcURL: rpcURL, secret: rpcSecret)
+    }
+
+    private var currentMenuBarStatus: MenuBarStatus {
+        if !isConnected && error != nil {
+            return .error
+        }
+        if stoppedDownloads.contains(where: { $0.isError }) {
+            return .error
+        }
+        if activeDownloads.contains(where: { $0.isActive }) {
+            return .downloading
+        }
+        if activeDownloads.contains(where: { $0.status == "paused" }) {
+            return .paused
+        }
+        if activeDownloads.contains(where: { $0.status == "waiting" }) ||
+            (globalStat?.waitingCount ?? 0) > 0 {
+            return .waiting
+        }
+        return .idle
     }
 
     func startPolling(applySavedOptions: Bool = true) {
@@ -62,10 +83,16 @@ class DownloadManager: ObservableObject {
             globalStat = latestStat
             isConnected = true
             error = nil
+            updateMenuBarStatus()
         } catch {
             isConnected = false
             self.error = error.localizedDescription
+            updateMenuBarStatus()
         }
+    }
+
+    private func updateMenuBarStatus() {
+        menuBarStatus = currentMenuBarStatus
     }
 
     func loadMoreStopped() async {
@@ -82,6 +109,7 @@ class DownloadManager: ObservableObject {
             hasMoreStopped = stoppedDownloads.count < total
         } catch {
             self.error = error.localizedDescription
+            updateMenuBarStatus()
         }
         isLoadingMore = false
     }
@@ -94,6 +122,7 @@ class DownloadManager: ObservableObject {
             await refresh()
         } catch {
             self.error = error.localizedDescription
+            updateMenuBarStatus()
         }
     }
 
@@ -104,6 +133,7 @@ class DownloadManager: ObservableObject {
             await refresh()
         } catch {
             self.error = error.localizedDescription
+            updateMenuBarStatus()
         }
     }
 
@@ -141,6 +171,7 @@ class DownloadManager: ObservableObject {
             await refresh()
         } catch {
             self.error = error.localizedDescription
+            updateMenuBarStatus()
         }
     }
 
@@ -150,6 +181,7 @@ class DownloadManager: ObservableObject {
             await refresh()
         } catch {
             self.error = error.localizedDescription
+            updateMenuBarStatus()
         }
     }
 
@@ -163,6 +195,7 @@ class DownloadManager: ObservableObject {
                 await refresh()
             } catch {
                 self.error = error.localizedDescription
+                updateMenuBarStatus()
             }
         }
     }
@@ -175,6 +208,7 @@ class DownloadManager: ObservableObject {
             await refresh()
         } catch {
             self.error = error.localizedDescription
+            updateMenuBarStatus()
         }
     }
 
@@ -230,6 +264,14 @@ class DownloadManager: ObservableObject {
         }
         return nil
     }
+}
+
+enum MenuBarStatus: Hashable {
+    case idle
+    case downloading
+    case waiting
+    case paused
+    case error
 }
 
 struct RemoteAria2Settings {

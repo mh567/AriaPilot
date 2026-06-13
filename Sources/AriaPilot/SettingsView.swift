@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 import ServiceManagement
 
 struct SettingsView: View {
@@ -17,7 +16,6 @@ struct SettingsView: View {
     @State private var validationError: String?
     @State private var connectionStatus: String?
     @State private var isLoadingRemoteSettings = false
-    @State private var remoteLoadTask: Task<Void, Never>?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -62,16 +60,6 @@ struct SettingsView: View {
             downloadSpeedLimit = manager.downloadSpeedLimit
             uploadSpeedLimit = manager.uploadSpeedLimit
             launchAtLogin = SMAppService.mainApp.status == .enabled
-            Task { await loadRemoteSettings(silent: true) }
-        }
-        .onChange(of: rpcURL) { _ in
-            scheduleRemoteSettingsLoad()
-        }
-        .onChange(of: rpcSecret) { _ in
-            scheduleRemoteSettingsLoad()
-        }
-        .onDisappear {
-            remoteLoadTask?.cancel()
         }
     }
 
@@ -108,16 +96,10 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("下载")
 
-            fieldLabel("下载位置")
-            TextField("使用 aria2 默认位置", text: $downloadDirectory)
+            fieldLabel("服务端下载路径")
+            TextField("使用 aria2 默认位置，例如 /downloads 或 D:\\Downloads", text: $downloadDirectory)
                 .textFieldStyle(.roundedBorder)
-            HStack {
-                helperText("新添加任务的默认保存文件夹。")
-                Spacer()
-                Button("选择") {
-                    chooseDownloadDirectory()
-                }
-            }
+            helperText("填写 aria2 服务所在机器能访问的路径。远程 aria2 请使用服务端路径，留空则使用 aria2 默认位置。")
 
             Stepper(
                 "同时下载任务：\(maxConcurrentDownloads)",
@@ -257,7 +239,7 @@ struct SettingsView: View {
 
     private var connectionStatusColor: Color {
         guard let connectionStatus else { return .secondary }
-        return connectionStatus.hasPrefix("已连接") ? .secondary : .red
+        return connectionStatus.hasPrefix("连接失败") ? .red : .secondary
     }
 
     private var isUpdateBusy: Bool {
@@ -297,27 +279,6 @@ struct SettingsView: View {
             if !silent {
                 connectionStatus = "连接失败：\(error.localizedDescription)"
             }
-        }
-    }
-
-    private func scheduleRemoteSettingsLoad() {
-        remoteLoadTask?.cancel()
-        connectionStatus = nil
-        remoteLoadTask = Task {
-            try? await Task.sleep(nanoseconds: 800_000_000)
-            guard !Task.isCancelled else { return }
-            await loadRemoteSettings()
-        }
-    }
-
-    private func chooseDownloadDirectory() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = true
-        if panel.runModal() == .OK, let url = panel.url {
-            downloadDirectory = url.path
         }
     }
 
