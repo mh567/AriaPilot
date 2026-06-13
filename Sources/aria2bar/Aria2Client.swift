@@ -45,6 +45,14 @@ struct Aria2Client {
         try await call(method: "aria2.getGlobalStat")
     }
 
+    func getGlobalOption() async throws -> Aria2Options {
+        try await call(method: "aria2.getGlobalOption")
+    }
+
+    func getOption(gid: String) async throws -> Aria2Options {
+        try await call(method: "aria2.getOption", params: [.string(gid)])
+    }
+
     func tellActive() async throws -> [Download] {
         try await call(method: "aria2.tellActive", params: [Self.defaultKeys])
     }

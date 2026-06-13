@@ -1,29 +1,11 @@
 import SwiftUI
 
-enum Page {
-    case main, add
-}
-
-struct ContentView: View {
+struct DownloadsWindowView: View {
     @EnvironmentObject var manager: DownloadManager
-    @State private var page: Page = .main
     @State private var tab: DownloadsTab = .downloading
+    @State private var page: Page = .main
 
     var body: some View {
-        VStack(spacing: 0) {
-            switch page {
-            case .main:
-                mainView
-            case .add:
-                AddDownloadView(page: $page)
-                    .environmentObject(manager)
-            }
-        }
-        .frame(width: 420)
-        .onAppear { manager.startPolling() }
-    }
-
-    private var mainView: some View {
         VStack(spacing: 0) {
             headerBar
             Divider()
@@ -31,12 +13,21 @@ struct ContentView: View {
                 errorBanner(error)
                 Divider()
             }
-            DownloadsListView(tab: $tab)
-                .environmentObject(manager)
-                .frame(height: 320)
+            if page == .add {
+                AddDownloadView(page: $page)
+                    .environmentObject(manager)
+                    .frame(maxWidth: 520)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                DownloadsListView(tab: $tab)
+                    .environmentObject(manager)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
             Divider()
             bottomBar
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var headerBar: some View {
@@ -64,8 +55,8 @@ struct ContentView: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -78,42 +69,30 @@ struct ContentView: View {
             Spacer()
         }
         .font(.caption2)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
         .padding(.vertical, 6)
         .background(Color.red.opacity(0.08))
     }
 
     private var bottomBar: some View {
         HStack {
-            Button { page = .add } label: {
-                Label("添加", systemImage: "plus")
-            }
-            .buttonStyle(.borderless)
-            Spacer()
             Button {
-                let menuWindow = NSApp.keyWindow
-                DownloadsWindowController.shared.open(manager: manager)
-                menuWindow?.close()
+                page = page == .add ? .main : .add
             } label: {
-                Label("打开窗口", systemImage: "macwindow")
+                Label(page == .add ? "返回" : "添加", systemImage: page == .add ? "chevron.left" : "plus")
             }
             .buttonStyle(.borderless)
+
+            Spacer()
+
             Button {
-                let menuWindow = NSApp.keyWindow
                 SettingsWindowController.shared.open(manager: manager)
-                menuWindow?.close()
             } label: {
                 Label("设置", systemImage: "gearshape")
             }
             .buttonStyle(.borderless)
-            Button {
-                NSApplication.shared.terminate(nil)
-            } label: {
-                Label("退出", systemImage: "power")
-            }
-            .buttonStyle(.borderless)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 }

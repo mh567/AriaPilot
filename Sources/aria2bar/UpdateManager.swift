@@ -38,7 +38,7 @@ final class UpdateManager: ObservableObject {
 
     func installUpdate(_ release: ReleaseInfo) async {
         guard let downloadURL = release.downloadURL else {
-            state = .failed("No macOS package found in the latest release.")
+            state = .failed("最新版本中没有找到 macOS 安装包。")
             return
         }
 
@@ -208,7 +208,7 @@ final class UpdateManager: ObservableObject {
                 let data = errorPipe.fileHandleForReading.readDataToEndOfFile()
                 let message = String(data: data, encoding: .utf8)?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                throw UpdateError.processFailed(message ?? "Update command failed.")
+                throw UpdateError.processFailed(message ?? "更新命令执行失败。")
             }
         }.value
     }
@@ -287,13 +287,13 @@ private enum UpdateError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .badServerResponse:
-            return "GitHub returned an unexpected response."
+            return "GitHub 返回了异常响应。"
         case .packageMissing:
-            return "No macOS package found in the latest release."
+            return "最新版本中没有找到 macOS 安装包。"
         case .extractedAppMissing:
-            return "The downloaded package did not contain aria2bar.app."
+            return "下载的安装包中没有 aria2bar.app。"
         case .invalidPackage:
-            return "The downloaded app package did not pass validation."
+            return "下载的 app 安装包未通过校验。"
         case .processFailed(let message):
             return message
         }

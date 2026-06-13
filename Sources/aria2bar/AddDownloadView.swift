@@ -7,16 +7,16 @@ struct AddDownloadView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("Add Download")
+            Text("添加下载")
                 .font(.headline)
 
-            TextField("URL", text: $url)
+            TextField("下载链接", text: $url)
                 .textFieldStyle(.roundedBorder)
 
             HStack(spacing: 6) {
                 Image(systemName: "folder")
                     .foregroundStyle(.secondary)
-                Text("Save to: \(downloadLocation)")
+                Text("保存到：\(downloadLocation)")
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer()
@@ -25,10 +25,10 @@ struct AddDownloadView: View {
             .foregroundStyle(.secondary)
 
             HStack {
-                Button("Cancel") { page = .main }
+                Button("取消") { page = .main }
                     .keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Add") {
+                Button("添加") {
                     let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !trimmed.isEmpty else { return }
                     Task {
@@ -45,6 +45,6 @@ struct AddDownloadView: View {
 
     private var downloadLocation: String {
         let dir = manager.downloadDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-        return dir.isEmpty ? "aria2 default" : dir
+        return dir.isEmpty ? "aria2 默认位置" : dir
     }
 }

@@ -4,7 +4,7 @@ import ServiceManagement
 
 struct SettingsView: View {
     @EnvironmentObject var manager: DownloadManager
-    @Binding var page: Page
+    var onClose: () -> Void
     @StateObject private var updateManager = UpdateManager()
     @State private var rpcURL = ""
     @State private var rpcSecret = ""
@@ -15,12 +15,12 @@ struct SettingsView: View {
     @State private var uploadSpeedLimit = ""
     @State private var launchAtLogin = false
     @State private var validationError: String?
+    @State private var connectionStatus: String?
+    @State private var isLoadingRemoteSettings = false
+    @State private var remoteLoadTask: Task<Void, Never>?
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("Settings")
-                .font(.headline)
-
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     connectionSection
@@ -30,7 +30,6 @@ struct SettingsView: View {
                     updateSection
                 }
             }
-            .frame(maxHeight: 520)
 
             if let validationError {
                 HStack(spacing: 6) {
@@ -43,16 +42,17 @@ struct SettingsView: View {
             }
 
             HStack {
-                Button("Cancel") { page = .main }
+                Button("取消") { onClose() }
                     .keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Save") {
+                Button("保存") {
                     save()
                 }
                 .keyboardShortcut(.defaultAction)
             }
         }
-        .padding()
+        .padding(20)
+        .frame(minWidth: 540, minHeight: 500)
         .onAppear {
             rpcURL = manager.rpcURL
             rpcSecret = manager.rpcSecret
@@ -62,47 +62,72 @@ struct SettingsView: View {
             downloadSpeedLimit = manager.downloadSpeedLimit
             uploadSpeedLimit = manager.uploadSpeedLimit
             launchAtLogin = SMAppService.mainApp.status == .enabled
+            Task { await loadRemoteSettings(silent: true) }
+        }
+        .onChange(of: rpcURL) { _ in
+            scheduleRemoteSettingsLoad()
+        }
+        .onChange(of: rpcSecret) { _ in
+            scheduleRemoteSettingsLoad()
+        }
+        .onDisappear {
+            remoteLoadTask?.cancel()
         }
     }
 
     private var connectionSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Connection")
+            sectionHeader("连接")
 
             fieldLabel("RPC URL")
             TextField("http://localhost:6800/jsonrpc", text: $rpcURL)
                 .textFieldStyle(.roundedBorder)
 
-            fieldLabel("Secret Token")
-            SecureField("Optional", text: $rpcSecret)
+            fieldLabel("密钥")
+            SecureField("可选", text: $rpcSecret)
                 .textFieldStyle(.roundedBorder)
+
+            HStack {
+                Button(remoteSettingsButtonTitle) {
+                    Task { await loadRemoteSettings() }
+                }
+                .disabled(isLoadingRemoteSettings)
+
+                if let connectionStatus {
+                    Text(connectionStatus)
+                        .font(.caption2)
+                        .foregroundStyle(connectionStatusColor)
+                        .lineLimit(2)
+                }
+                Spacer()
+            }
         }
     }
 
     private var downloadSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Download")
+            sectionHeader("下载")
 
-            fieldLabel("Download Location")
-            TextField("Use aria2 default", text: $downloadDirectory)
+            fieldLabel("下载位置")
+            TextField("使用 aria2 默认位置", text: $downloadDirectory)
                 .textFieldStyle(.roundedBorder)
             HStack {
-                helperText("Default folder for newly added downloads.")
+                helperText("新添加任务的默认保存文件夹。")
                 Spacer()
-                Button("Choose") {
+                Button("选择") {
                     chooseDownloadDirectory()
                 }
             }
 
             Stepper(
-                "Concurrent Downloads: \(maxConcurrentDownloads)",
+                "同时下载任务：\(maxConcurrentDownloads)",
                 value: $maxConcurrentDownloads,
                 in: 1...100
             )
             .font(.caption)
 
             Stepper(
-                "Connections per Download: \(connectionsPerDownload)",
+                "单任务连接数：\(connectionsPerDownload)",
                 value: $connectionsPerDownload,
                 in: 1...64
             )
@@ -112,25 +137,25 @@ struct SettingsView: View {
 
     private var speedSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Speed Limits")
+            sectionHeader("速度限制")
 
-            fieldLabel("Global Download Limit")
+            fieldLabel("全局下载限速")
             TextField("0, 500K, 2M", text: $downloadSpeedLimit)
                 .textFieldStyle(.roundedBorder)
 
-            fieldLabel("Global Upload Limit")
+            fieldLabel("全局上传限速")
             TextField("0, 500K, 2M", text: $uploadSpeedLimit)
                 .textFieldStyle(.roundedBorder)
 
-            helperText("Use 0 for unlimited. Examples: 500K, 2M.")
+            helperText("0 表示不限速。例如：500K、2M。")
         }
     }
 
     private var startupSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Startup")
+            sectionHeader("启动")
 
-            Toggle("Launch at Login", isOn: $launchAtLogin)
+            Toggle("登录时启动", isOn: $launchAtLogin)
                 .font(.caption)
                 .onChange(of: launchAtLogin, perform: setLaunchAtLogin)
         }
@@ -138,10 +163,10 @@ struct SettingsView: View {
 
     private var updateSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Updates")
+            sectionHeader("更新")
 
             HStack {
-                Text("Current Version: \(updateManager.currentVersion)")
+                Text("当前版本：\(updateManager.currentVersion)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -161,7 +186,7 @@ struct SettingsView: View {
                 .disabled(isUpdateBusy)
 
                 if case .available(let release) = updateManager.state {
-                    Button("Update Now") {
+                    Button("立即更新") {
                         Task { await updateManager.installUpdate(release) }
                     }
                     .disabled(isUpdateBusy)
@@ -192,11 +217,11 @@ struct SettingsView: View {
     private var updateButtonTitle: String {
         switch updateManager.state {
         case .checking:
-            return "Checking..."
+            return "检查中..."
         case .downloading:
-            return "Updating..."
+            return "更新中..."
         default:
-            return "Check for Updates"
+            return "检查更新"
         }
     }
 
@@ -205,15 +230,15 @@ struct SettingsView: View {
         case .idle:
             return nil
         case .checking:
-            return "Checking the latest GitHub release."
+            return "正在检查 GitHub 最新版本。"
         case .available(let release):
-            return "Version \(release.version) is available."
+            return "发现新版本 \(release.version)。"
         case .upToDate:
-            return "You are up to date."
+            return "当前已是最新版本。"
         case .downloading:
-            return "Downloading and preparing the update."
+            return "正在下载并准备更新。"
         case .readyToRestart:
-            return "Restarting to finish the update."
+            return "正在重启以完成更新。"
         case .failed(let message):
             return message
         }
@@ -226,12 +251,62 @@ struct SettingsView: View {
         return .secondary
     }
 
+    private var remoteSettingsButtonTitle: String {
+        isLoadingRemoteSettings ? "检测中..." : "检测并读取配置"
+    }
+
+    private var connectionStatusColor: Color {
+        guard let connectionStatus else { return .secondary }
+        return connectionStatus.hasPrefix("已连接") ? .secondary : .red
+    }
+
     private var isUpdateBusy: Bool {
         switch updateManager.state {
         case .checking, .downloading, .readyToRestart:
             return true
         default:
             return false
+        }
+    }
+
+    private func loadRemoteSettings(silent: Bool = false) async {
+        let url = rpcURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !url.isEmpty else {
+            connectionStatus = "请先填写 RPC URL。"
+            return
+        }
+
+        isLoadingRemoteSettings = true
+        if !silent {
+            connectionStatus = "正在连接 aria2..."
+        }
+        defer { isLoadingRemoteSettings = false }
+
+        do {
+            let remote = try await manager.loadRemoteSettings(
+                rpcURL: url,
+                rpcSecret: rpcSecret
+            )
+            downloadDirectory = remote.downloadDirectory
+            maxConcurrentDownloads = remote.maxConcurrentDownloads
+            connectionsPerDownload = remote.connectionsPerDownload
+            downloadSpeedLimit = remote.downloadSpeedLimit
+            uploadSpeedLimit = remote.uploadSpeedLimit
+            connectionStatus = "已连接，并已读取 aria2 配置。"
+        } catch {
+            if !silent {
+                connectionStatus = "连接失败：\(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func scheduleRemoteSettingsLoad() {
+        remoteLoadTask?.cancel()
+        connectionStatus = nil
+        remoteLoadTask = Task {
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            guard !Task.isCancelled else { return }
+            await loadRemoteSettings()
         }
     }
 
@@ -250,7 +325,7 @@ struct SettingsView: View {
         validationError = nil
         guard isValidSpeedLimit(downloadSpeedLimit),
               isValidSpeedLimit(uploadSpeedLimit) else {
-            validationError = "Speed limits must be 0 or values like 500K and 2M."
+            validationError = "速度限制必须是 0，或类似 500K、2M 的数值。"
             return
         }
 
@@ -262,10 +337,10 @@ struct SettingsView: View {
         manager.downloadSpeedLimit = downloadSpeedLimit.trimmingCharacters(in: .whitespacesAndNewlines)
         manager.uploadSpeedLimit = uploadSpeedLimit.trimmingCharacters(in: .whitespacesAndNewlines)
         manager.hasSavedDownloadSettings = true
-        manager.startPolling()
+        manager.startPolling(applySavedOptions: false)
         Task {
             await manager.applyGlobalOptions()
-            page = .main
+            onClose()
         }
     }
 

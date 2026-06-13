@@ -40,6 +40,24 @@ struct RPCError: Decodable, LocalizedError {
     var errorDescription: String? { message }
 }
 
+struct Aria2Options: Decodable {
+    let dir: String?
+    let split: String?
+    let maxConnectionPerServer: String?
+    let maxConcurrentDownloads: String?
+    let maxOverallDownloadLimit: String?
+    let maxOverallUploadLimit: String?
+
+    enum CodingKeys: String, CodingKey {
+        case dir
+        case split
+        case maxConnectionPerServer = "max-connection-per-server"
+        case maxConcurrentDownloads = "max-concurrent-downloads"
+        case maxOverallDownloadLimit = "max-overall-download-limit"
+        case maxOverallUploadLimit = "max-overall-upload-limit"
+    }
+}
+
 // MARK: - Download
 
 struct Download: Identifiable, Decodable {

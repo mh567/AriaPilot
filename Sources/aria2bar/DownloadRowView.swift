@@ -40,7 +40,7 @@ struct DownloadRowView: View {
             } else if download.isPaused {
                 Image(systemName: "pause.fill")
                     .font(.caption2)
-                Text("Paused")
+                Text("已暂停")
             } else if download.isComplete {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.caption2)

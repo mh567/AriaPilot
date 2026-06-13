@@ -27,13 +27,13 @@ class DownloadManager: ObservableObject {
         Aria2Client(rpcURL: rpcURL, secret: rpcSecret)
     }
 
-    func startPolling() {
+    func startPolling(applySavedOptions: Bool = true) {
         stopPolling()
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             Task { await self?.refresh() }
         }
         Task {
-            if hasSavedDownloadSettings {
+            if hasSavedDownloadSettings && applySavedOptions {
                 await applyGlobalOptions()
             } else {
                 await refresh()
@@ -52,14 +52,14 @@ class DownloadManager: ObservableObject {
             let loadedCount = max(stoppedDownloads.count, pageSize)
             async let active = c.tellActive()
             async let waiting = c.tellWaiting()
-            async let stopped = c.tellStopped(offset: 0, num: loadedCount)
             async let stat = c.getGlobalStat()
 
             activeDownloads = try await active + waiting
-            let page = try await stopped
-            stoppedDownloads = page
-            hasMoreStopped = page.count >= loadedCount
-            globalStat = try await stat
+            let latestStat = try await stat
+            let stopped = try await stoppedPage(total: latestStat.stoppedCount, loadedCount: loadedCount)
+            stoppedDownloads = stopped
+            hasMoreStopped = stopped.count < latestStat.stoppedCount
+            globalStat = latestStat
             isConnected = true
             error = nil
         } catch {
@@ -72,12 +72,14 @@ class DownloadManager: ObservableObject {
         guard !isLoadingMore, hasMoreStopped else { return }
         isLoadingMore = true
         do {
-            let page = try await client.tellStopped(
-                offset: stoppedDownloads.count,
-                num: pageSize
+            let total = globalStat?.stoppedCount ?? stoppedDownloads.count
+            let loadedCount = min(stoppedDownloads.count + pageSize, total)
+            let page = try await stoppedPage(
+                total: total,
+                loadedCount: loadedCount
             )
-            stoppedDownloads.append(contentsOf: page)
-            hasMoreStopped = page.count >= pageSize
+            stoppedDownloads = page
+            hasMoreStopped = stoppedDownloads.count < total
         } catch {
             self.error = error.localizedDescription
         }
@@ -103,6 +105,34 @@ class DownloadManager: ObservableObject {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    func loadRemoteSettings(rpcURL: String, rpcSecret: String) async throws -> RemoteAria2Settings {
+        let c = Aria2Client(rpcURL: rpcURL, secret: rpcSecret)
+        async let options = c.getGlobalOption()
+        async let active = c.tellActive()
+        async let waiting = c.tellWaiting()
+        let globalOptions = try await options
+        let downloads = try await active + waiting
+
+        let taskOptions = await firstTaskOptions(from: downloads, client: c)
+
+        return RemoteAria2Settings(
+            downloadDirectory: globalOptions.dir ?? "",
+            maxConcurrentDownloads: positiveInt(
+                globalOptions.maxConcurrentDownloads,
+                fallback: maxConcurrentDownloads
+            ),
+            connectionsPerDownload: positiveInt(
+                globalOptions.split ??
+                    globalOptions.maxConnectionPerServer ??
+                    taskOptions?.split ??
+                    taskOptions?.maxConnectionPerServer,
+                fallback: connectionsPerDownload
+            ),
+            downloadSpeedLimit: globalOptions.maxOverallDownloadLimit ?? "0",
+            uploadSpeedLimit: globalOptions.maxOverallUploadLimit ?? "0"
+        )
     }
 
     func pause(gid: String) async {
@@ -172,4 +202,40 @@ class DownloadManager: ObservableObject {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "0" : trimmed
     }
+
+    private func stoppedPage(total: Int, loadedCount: Int) async throws -> [Download] {
+        guard total > 0 else { return [] }
+        let count = min(loadedCount, total)
+        return try await client.tellStopped(offset: -1, num: count)
+    }
+
+    private func positiveInt(_ value: String?, fallback: Int) -> Int {
+        guard let value,
+              let number = Int(value),
+              number > 0 else {
+            return fallback
+        }
+        return number
+    }
+
+    private func firstTaskOptions(
+        from downloads: [Download],
+        client: Aria2Client
+    ) async -> Aria2Options? {
+        for download in downloads {
+            if let options = try? await client.getOption(gid: download.gid),
+               options.split != nil || options.maxConnectionPerServer != nil {
+                return options
+            }
+        }
+        return nil
+    }
+}
+
+struct RemoteAria2Settings {
+    let downloadDirectory: String
+    let maxConcurrentDownloads: Int
+    let connectionsPerDownload: Int
+    let downloadSpeedLimit: String
+    let uploadSpeedLimit: String
 }

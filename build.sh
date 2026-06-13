@@ -2,8 +2,8 @@
 set -e
 
 APP_NAME="aria2bar"
-APP_VERSION="1.2.0"
-BUILD_NUMBER="120"
+APP_VERSION="1.3.0"
+BUILD_NUMBER="130"
 BUILD_DIR=".build/release"
 APP_BUNDLE="$APP_NAME.app"
 CONTENTS="$APP_BUNDLE/Contents"
@@ -41,7 +41,7 @@ cat > "$CONTENTS/Info.plist" << EOF
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>aria2bar connects to the local aria2 RPC service.</string>
+	<string>aria2bar 需要连接本机 aria2 RPC 服务。</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
