@@ -1,6 +1,6 @@
 name: Update bundled aria2
 
-on:
+"on":
   push:
     paths:
       - ".github/workflows/aria2-binary-update.yml"
@@ -141,8 +141,8 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           branch: codex/update-aria2-${{ steps.release.outputs.version }}
-          commit-message: chore: update bundled aria2 to ${{ steps.release.outputs.version }}
-          title: Update bundled aria2 to ${{ steps.release.outputs.version }}
+          commit-message: "chore: update bundled aria2 to ${{ steps.release.outputs.version }}"
+          title: "Update bundled aria2 to ${{ steps.release.outputs.version }}"
           body: |
             Updates the bundled macOS ARM64 aria2c binary from the official aria2 source release.
 
