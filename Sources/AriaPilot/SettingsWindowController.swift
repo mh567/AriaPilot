@@ -19,15 +19,16 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             settingsWindow.close()
         }
         .environmentObject(manager)
-        .frame(minWidth: 540, minHeight: 500)
+        .frame(minWidth: 560, minHeight: 520)
 
         settingsWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 560),
-            styleMask: [.titled, .closable, .miniaturizable],
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 620),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         settingsWindow.title = "AriaPilot 设置"
+        settingsWindow.minSize = NSSize(width: 560, height: 520)
         settingsWindow.contentViewController = NSHostingController(rootView: view)
         settingsWindow.delegate = self
         settingsWindow.isReleasedWhenClosed = false

@@ -36,18 +36,6 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
         }
     }
 
-    var systemImage: String {
-        switch self {
-        case .connection:
-            return "network"
-        case .downloads:
-            return "arrow.down.circle"
-        case .delete:
-            return "trash"
-        case .app:
-            return "gearshape"
-        }
-    }
 }
 
 struct SettingsView: View {
@@ -72,21 +60,24 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 0) {
-                sidebar
-
-                Divider()
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        paneHeader
-                        selectedPaneContent
-                    }
-                    .padding(20)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
+            VStack(alignment: .leading, spacing: 12) {
+                paneHeader
+                panePicker
             }
-            .frame(minHeight: 500)
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 12)
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    selectedPaneContent
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(minHeight: 0, maxHeight: .infinity)
 
             if let validationError {
                 HStack(spacing: 6) {
@@ -113,7 +104,7 @@ struct SettingsView: View {
             .padding(16)
             .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(minWidth: 720, minHeight: 560)
+        .frame(minWidth: 560, minHeight: 520)
         .onAppear {
             connectionMode = ConnectionMode(rawValue: manager.connectionMode) ?? .remote
             if connectionMode == .local {
@@ -156,40 +147,14 @@ struct SettingsView: View {
         }
     }
 
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("设置")
-                .font(.headline)
-                .padding(.bottom, 8)
-
+    private var panePicker: some View {
+        Picker("设置分类", selection: $selectedPane) {
             ForEach(SettingsPane.allCases) { pane in
-                Button {
-                    selectedPane = pane
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: pane.systemImage)
-                            .frame(width: 18)
-                        Text(pane.title)
-                        Spacer()
-                    }
-                    .font(.caption)
-                    .fontWeight(selectedPane == pane ? .semibold : .regular)
-                    .foregroundStyle(selectedPane == pane ? .primary : .secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7)
-                            .fill(selectedPane == pane ? Color.accentColor.opacity(0.14) : Color.clear)
-                    )
-                }
-                .buttonStyle(.plain)
+                Text(pane.title).tag(pane)
             }
-
-            Spacer()
         }
-        .padding(16)
-        .frame(width: 164)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .pickerStyle(.segmented)
+        .labelsHidden()
     }
 
     private var paneHeader: some View {
@@ -329,31 +294,35 @@ struct SettingsView: View {
                 .disabled(localService.action != .idle)
             }
 
-            HStack(spacing: 8) {
-                Button("安装服务") {
-                    Task { await installLocalService() }
-                }
-                .disabled(!canInstallLocalService)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Button("安装服务") {
+                        Task { await installLocalService() }
+                    }
+                    .disabled(!canInstallLocalService)
 
-                Button("启动") {
-                    Task { await localService.start() }
-                }
-                .disabled(!canStartLocalService)
+                    Button("启动") {
+                        Task { await localService.start() }
+                    }
+                    .disabled(!canStartLocalService)
 
-                Button("重启") {
-                    Task { await restartLocalService() }
+                    Button("重启") {
+                        Task { await restartLocalService() }
+                    }
+                    .disabled(!canRestartLocalService)
                 }
-                .disabled(!canRestartLocalService)
 
-                Button("停止") {
-                    Task { await localService.stop() }
-                }
-                .disabled(!canStopLocalService)
+                HStack(spacing: 8) {
+                    Button("停止") {
+                        Task { await localService.stop() }
+                    }
+                    .disabled(!canStopLocalService)
 
-                Button("卸载服务") {
-                    Task { await localService.uninstall() }
+                    Button("卸载服务") {
+                        Task { await localService.uninstall() }
+                    }
+                    .disabled(!canUninstallLocalService)
                 }
-                .disabled(!canUninstallLocalService)
             }
         }
     }
@@ -382,7 +351,7 @@ struct SettingsView: View {
                 .padding(.vertical, 4)
 
             sectionHeader("任务参数")
-            HStack(spacing: 18) {
+            VStack(alignment: .leading, spacing: 8) {
                 Stepper(
                     "同时下载任务：\(maxConcurrentDownloads)",
                     value: $maxConcurrentDownloads,
@@ -404,17 +373,14 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("速度限制")
 
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    fieldLabel("全局下载限速")
-                    TextField("0, 500K, 2M", text: $downloadSpeedLimit)
-                        .textFieldStyle(.roundedBorder)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    fieldLabel("全局上传限速")
-                    TextField("0, 500K, 2M", text: $uploadSpeedLimit)
-                        .textFieldStyle(.roundedBorder)
-                }
+            VStack(alignment: .leading, spacing: 8) {
+                fieldLabel("全局下载限速")
+                TextField("0, 500K, 2M", text: $downloadSpeedLimit)
+                    .textFieldStyle(.roundedBorder)
+
+                fieldLabel("全局上传限速")
+                TextField("0, 500K, 2M", text: $uploadSpeedLimit)
+                    .textFieldStyle(.roundedBorder)
             }
 
             helperText("0 表示不限速。例如：500K、2M。")
