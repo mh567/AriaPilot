@@ -1,0 +1,14 @@
+name: Actions smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/actions-smoke-test.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print status
+        run: echo "GitHub Actions workflow parsing works"
