@@ -1,6 +1,9 @@
 name: Update bundled aria2
 
 on:
+  push:
+    paths:
+      - ".github/workflows/aria2-binary-update.yml"
   workflow_dispatch:
     inputs:
       force_rebuild:
