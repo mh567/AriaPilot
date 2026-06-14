@@ -56,14 +56,64 @@ final class UpdateManager: ObservableObject {
     }
 
     private func fetchLatestRelease() async throws -> ReleaseInfo {
+        do {
+            return try await fetchLatestReleaseFromRedirect()
+        } catch {
+            return try await fetchLatestReleaseFromAPI()
+        }
+    }
+
+    private func fetchLatestReleaseFromRedirect() async throws -> ReleaseInfo {
+        let url = URL(string: "https://github.com/mh567/AriaPilot/releases/latest")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        request.setValue("AriaPilot", forHTTPHeaderField: "User-Agent")
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw UpdateError.badServerResponse(nil)
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw UpdateError.badServerResponse(http.statusCode)
+        }
+        guard let releaseURL = http.url,
+              let tagName = latestTagName(from: releaseURL) else {
+            throw UpdateError.badServerResponse(http.statusCode)
+        }
+
+        let version = tagName.trimmingCharacters(in: CharacterSet(charactersIn: "v"))
+        let downloadURL = URL(
+            string: "https://github.com/mh567/AriaPilot/releases/download/\(tagName)/AriaPilot-\(tagName)-macos.zip"
+        )
+
+        return ReleaseInfo(
+            version: version,
+            tagName: tagName,
+            releaseURL: releaseURL,
+            downloadURL: downloadURL
+        )
+    }
+
+    private func latestTagName(from url: URL) -> String? {
+        let components = url.pathComponents
+        guard let tagIndex = components.firstIndex(of: "tag"),
+              components.indices.contains(tagIndex + 1) else {
+            return nil
+        }
+        return components[tagIndex + 1]
+    }
+
+    private func fetchLatestReleaseFromAPI() async throws -> ReleaseInfo {
         let url = URL(string: "https://api.github.com/repos/mh567/AriaPilot/releases/latest")!
         var request = URLRequest(url: url)
         request.setValue("AriaPilot", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse,
-              (200..<300).contains(http.statusCode) else {
-            throw UpdateError.badServerResponse
+        guard let http = response as? HTTPURLResponse else {
+            throw UpdateError.badServerResponse(nil)
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw UpdateError.badServerResponse(http.statusCode)
         }
 
         let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
@@ -86,9 +136,11 @@ final class UpdateManager: ObservableObject {
 
     private func downloadPackage(from url: URL) async throws -> URL {
         let (temporaryURL, response) = try await URLSession.shared.download(from: url)
-        guard let http = response as? HTTPURLResponse,
-              (200..<300).contains(http.statusCode) else {
-            throw UpdateError.badServerResponse
+        guard let http = response as? HTTPURLResponse else {
+            throw UpdateError.badServerResponse(nil)
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw UpdateError.badServerResponse(http.statusCode)
         }
 
         let destination = FileManager.default.temporaryDirectory
@@ -278,7 +330,7 @@ private struct Version: Comparable {
 }
 
 private enum UpdateError: LocalizedError {
-    case badServerResponse
+    case badServerResponse(Int?)
     case packageMissing
     case extractedAppMissing
     case invalidPackage
@@ -286,7 +338,10 @@ private enum UpdateError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .badServerResponse:
+        case .badServerResponse(let statusCode):
+            if let statusCode {
+                return "GitHub 返回了异常响应（HTTP \(statusCode)）。"
+            }
             return "GitHub 返回了异常响应。"
         case .packageMissing:
             return "最新版本中没有找到 macOS 安装包。"
