@@ -2,124 +2,47 @@
 
 ![AriaPilot 产品预览](assets/ariapilot-hero.svg)
 
-AriaPilot 是一个轻量级 macOS 菜单栏工具，用来查看和管理 aria2 下载任务。它通过 aria2 JSON RPC 连接到正在运行的 aria2 实例，适合希望把 aria2 常驻在后台，同时保留一个原生小面板来操作下载任务的用户。
+AriaPilot 是一个 macOS 菜单栏下载管理工具，基于 aria2 JSON RPC 管理下载任务。它既可以连接远程 aria2 服务，也可以在本机安装并管理内置 aria2 后端，把应用直接作为完整下载器使用。
 
-## 功能
+## 核心功能
 
-### 菜单栏面板
+1. 菜单栏实时查看下载状态、全局速度和任务列表
+2. 添加、暂停、继续、删除下载任务
+3. 支持下载中、等待、暂停、错误等状态角标
+4. 支持独立下载任务窗口，适合管理较多任务
+5. 支持本机下载服务和远程 aria2 服务两种模式
+6. 支持一键安装、启动、重启、停止、卸载本机 aria2 服务
+7. 支持本机已完成任务记录持久化
+8. 支持删除任务时选择是否同时删除已下载文件
+9. 支持登录时启动和应用内检查更新
+10. 内置 macOS ARM64 aria2 后端，构建前可自动同步最新 vendor 更新
 
-菜单栏面板用于快速查看当前状态和执行高频操作：
+## 下载
 
-1. 查看全局下载和上传速度
-2. 查看下载中任务和已完成任务
-3. 添加下载链接
-4. 暂停、继续、删除任务
-5. 打开独立下载任务窗口
-6. 打开设置窗口
-7. 退出应用
+打开 [GitHub Releases](https://github.com/mh567/AriaPilot/releases)，下载最新的 `AriaPilot-vx.x.x-macos.zip`。
 
-菜单栏图标会根据任务状态显示黑白角标：
+解压后把 `AriaPilot.app` 拖入“应用程序”即可使用。
 
-1. 下载中显示右下角实心点
-2. 等待中显示右下角空心点
-3. 暂停显示右下角暂停标识
-4. 连接失败或任务错误显示右上角感叹号
+## 使用方式
 
-### 独立下载任务窗口
+AriaPilot 支持两类连接模式：
 
-当任务较多时，可以从菜单栏点击“打开窗口”进入独立下载任务窗口。独立窗口支持正常拖拽调整大小，适合长时间管理任务列表。
+1. 本机下载服务：由 AriaPilot 管理本机 aria2 后端，适合作为独立下载器使用。
+2. 远程 aria2 服务：连接 NAS、服务器或其他设备上的 aria2 RPC 服务。
 
-### 设置窗口
+详细安装、配置和使用说明见 [使用说明](docs/USER_GUIDE.md)。
 
-设置窗口支持：
+## 系统要求
 
-1. 配置 RPC URL 和密钥
-2. 检测 aria2 连接并读取运行配置
-3. 在本机下载服务和远程 aria2 服务之间切换
-4. 安装、启动、重启、停止、卸载和检测本机下载服务
-5. 设置新任务默认服务端下载路径
-6. 设置同时下载任务数量
-7. 设置新任务连接数
-8. 设置全局下载和上传速度限制
-9. 配置登录时启动
-10. 检查并安装新版本
+1. macOS 13.0 或更高版本
+2. Apple Silicon Mac
 
-服务端下载路径指 aria2 所在机器能访问的路径。远程 aria2 场景下，请填写服务端路径，例如 `/downloads` 或 `D:\Downloads`。留空时使用 aria2 默认位置。
-
-说明：AriaPilot 的“已完成”列表来自 aria2 RPC 的 `aria2.tellStopped`，它不会扫描下载目录。如果 aria2 没有保留历史结果，列表会显示为空。
-
-## 本机下载服务
-
-AriaPilot 可以管理一个用户级本机 aria2 服务。选择“本机下载服务”只会切换设置界面，不会自动安装、启动或停止服务。本机服务相关动作由“安装服务”“启动”“重启”“停止”“卸载服务”“检测服务”这些按钮完成。
-
-本机服务默认使用：
-
-```text
-RPC URL: http://localhost:6800/jsonrpc
-下载路径: ~/Downloads/AriaPilot
-LaunchAgent: ~/Library/LaunchAgents/com.ariapilot.aria2.plist
-配置目录: ~/Library/Application Support/AriaPilot/aria2
-```
-
-保存按钮只保存当前连接方式和下载设置。保存“本机下载服务”会让客户端连接本机 RPC，但不会自动安装服务；保存“远程 aria2 服务”会让客户端连接远程 RPC，也不会自动停止本机服务。远程配置和本机配置会分开保存，切换模式不会覆盖另一套配置。
-
-## 安装
-
-1. 打开 [Releases](https://github.com/mh567/AriaPilot/releases)
-2. 下载最新的 `AriaPilot-vx.x.x-macos.zip`
-3. 解压后把 `AriaPilot.app` 拖入“应用程序”
-4. 启动 AriaPilot
-5. 在设置窗口中配置 aria2 RPC
-
-## aria2 RPC 配置
-
-AriaPilot 需要连接到已经开启 RPC 的 aria2。
-
-本机常见启动示例：
-
-```bash
-aria2c --enable-rpc --rpc-listen-all=false --rpc-listen-port=6800 --rpc-secret=123456
-```
-
-对应的 AriaPilot 设置：
-
-```text
-RPC URL: http://localhost:6800/jsonrpc
-密钥: 123456
-```
-
-如果 aria2 运行在局域网其他设备上，把 `localhost` 换成对应设备的 IP 地址。
-
-## 历史任务
-
-AriaPilot 的已完成列表依赖 aria2 当前会话中保留的下载结果。若希望 aria2 重启后仍能恢复任务和历史，请根据自己的 aria2 使用方式配置 session 文件，例如：
-
-```bash
-aria2c \
-  --enable-rpc \
-  --rpc-secret=123456 \
-  --save-session=/path/to/aria2.session \
-  --input-file=/path/to/aria2.session \
-  --save-session-interval=60
-```
-
-如果配置了 `max-download-result=0`，aria2 不会保留已停止任务结果，AriaPilot 的已完成列表也会为空。
-
-## 应用内更新
-
-设置窗口中提供“检查更新”和“立即更新”。更新来源为 GitHub Releases。下载完成后，AriaPilot 会校验安装包中的 bundle id 和版本号，再替换当前应用并重新打开。
+如果使用远程 aria2 服务，需要远端服务已开启 JSON RPC。
 
 ## 开发构建
 
-调试构建：
-
 ```bash
 swift build
-```
-
-发布构建：
-
-```bash
 bash build.sh
 ```
 
@@ -130,48 +53,15 @@ AriaPilot.app
 AriaPilot-vx.x.x-macos.zip
 ```
 
-发布构建会把下面的内置后端复制进 app bundle：
-
-```text
-vendor/aria2/darwin-arm64/aria2c
-```
-
-官方 aria2 Release 当前没有 macOS ARM64 预编译包。仓库内的 `Update bundled aria2` workflow 会在 macOS ARM runner 上从官方源码编译 `aria2c`，更新 vendor 二进制并创建 PR。
-
-## 系统要求
-
-1. macOS 13.0 或更高版本
-2. aria2 已安装并开启 RPC
-3. Swift 5.9 或更高版本，用于本地开发构建
-
-## 项目结构
-
-```text
-Sources/AriaPilot/
-├── AriaPilotApp.swift
-├── ContentView.swift
-├── DownloadsWindowView.swift
-├── DownloadsWindowController.swift
-├── DownloadsListView.swift
-├── SettingsView.swift
-├── SettingsWindowController.swift
-├── AddDownloadView.swift
-├── DownloadRowView.swift
-├── DownloadManager.swift
-├── Aria2Client.swift
-├── UpdateManager.swift
-├── Models.swift
-└── Helpers.swift
-```
+构建脚本会在编译前检查 bundled aria2 vendor 更新 PR。若存在安全的 vendor 更新，会先合并并拉取最新二进制，再继续打包。
 
 ## 技术栈
 
 1. Swift
 2. SwiftUI
 3. Swift Package Manager
-4. URLSession
-5. aria2 JSON RPC
-6. ServiceManagement
+4. aria2 JSON RPC
+5. ServiceManagement
 
 ## 许可证
 
