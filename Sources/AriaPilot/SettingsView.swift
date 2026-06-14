@@ -2,42 +2,6 @@ import AppKit
 import SwiftUI
 import ServiceManagement
 
-private enum SettingsPane: String, CaseIterable, Identifiable {
-    case connection
-    case downloads
-    case delete
-    case app
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .connection:
-            return "连接与服务"
-        case .downloads:
-            return "下载参数"
-        case .delete:
-            return "删除策略"
-        case .app:
-            return "应用"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .connection:
-            return "选择本机或远程后端，并管理本机 aria2 服务。"
-        case .downloads:
-            return "设置保存路径、任务并发、连接数和速度限制。"
-        case .delete:
-            return "设置删除任务时的默认处理方式。"
-        case .app:
-            return "管理登录启动和应用更新。"
-        }
-    }
-
-}
-
 struct SettingsView: View {
     @EnvironmentObject var manager: DownloadManager
     var onClose: () -> Void
@@ -55,14 +19,13 @@ struct SettingsView: View {
     @State private var validationError: String?
     @State private var connectionStatus: String?
     @State private var isLoadingRemoteSettings = false
-    @State private var selectedPane: SettingsPane = .connection
     @AppStorage("deleteActionPreference") private var deleteActionPreference = DeleteActionPreference.ask.rawValue
 
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                paneHeader
-                panePicker
+                backendHeader
+                backendModePicker
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)
@@ -72,7 +35,9 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    selectedPaneContent
+                    backendContent
+                    downloadOptionsContent
+                    commonOptionsContent
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -147,119 +112,92 @@ struct SettingsView: View {
         }
     }
 
-    private var panePicker: some View {
-        Picker("设置分类", selection: $selectedPane) {
-            ForEach(SettingsPane.allCases) { pane in
-                Text(pane.title).tag(pane)
-            }
+    private var backendModePicker: some View {
+        Picker("下载后端", selection: $connectionMode) {
+            Text("本机下载服务").tag(ConnectionMode.local)
+            Text("远程 aria2 服务").tag(ConnectionMode.remote)
         }
         .pickerStyle(.segmented)
         .labelsHidden()
     }
 
-    private var paneHeader: some View {
+    private var backendHeader: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(selectedPane.title)
+            Text("下载后端")
                 .font(.title3)
                 .fontWeight(.semibold)
-            Text(selectedPane.subtitle)
+            Text(backendDescription)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
 
+    private var backendDescription: String {
+        if connectionMode == .local {
+            return "使用 AriaPilot 管理的本机 aria2 后端，路径和文件删除都作用在这台 Mac。"
+        }
+        return "连接远端 aria2 RPC，路径需要填写远端服务能访问的位置。"
+    }
+
     @ViewBuilder
-    private var selectedPaneContent: some View {
-        switch selectedPane {
-        case .connection:
-            connectionPane
-        case .downloads:
-            downloadsPane
-        case .delete:
-            deletePane
-        case .app:
-            appPane
-        }
-    }
-
-    private var connectionPane: some View {
-        VStack(alignment: .leading, spacing: 14) {
+    private var backendContent: some View {
+        if connectionMode == .local {
             settingsPanel {
-                connectionSection
+                localServiceSection
             }
-
-            if connectionMode == .local {
-                settingsPanel {
-                    localServiceSection
-                }
+        } else {
+            settingsPanel {
+                remoteConnectionSection
             }
         }
     }
 
-    private var downloadsPane: some View {
+    private var downloadOptionsContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             settingsPanel {
                 downloadSection
             }
-
             settingsPanel {
                 speedSection
             }
         }
     }
 
-    private var deletePane: some View {
-        settingsPanel {
-            deletionSection
-        }
-    }
-
-    private var appPane: some View {
+    private var commonOptionsContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             settingsPanel {
-                startupSection
+                deletionSection
             }
-
             settingsPanel {
-                updateSection
+                appSection
             }
         }
     }
 
-    private var connectionSection: some View {
+    private var remoteConnectionSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("连接方式")
+            sectionHeader("远程连接")
 
-            Picker("连接方式", selection: $connectionMode) {
-                Text("本机下载服务").tag(ConnectionMode.local)
-                Text("远程 aria2 服务").tag(ConnectionMode.remote)
-            }
-            .pickerStyle(.segmented)
+            fieldLabel("RPC URL")
+            TextField("http://服务器地址:6800/jsonrpc", text: $rpcURL)
+                .textFieldStyle(.roundedBorder)
+            fieldLabel("密钥")
+            SecureField("可选", text: $rpcSecret)
+                .textFieldStyle(.roundedBorder)
 
-            if connectionMode == .remote {
-                fieldLabel("RPC URL")
-                TextField("http://localhost:6800/jsonrpc", text: $rpcURL)
-                    .textFieldStyle(.roundedBorder)
-                fieldLabel("密钥")
-                SecureField("可选", text: $rpcSecret)
-                    .textFieldStyle(.roundedBorder)
-
-                HStack(alignment: .center, spacing: 10) {
-                    Button(remoteSettingsButtonTitle) {
-                        Task { await loadRemoteSettings() }
-                    }
-                    .disabled(isLoadingRemoteSettings)
-
-                    if let connectionStatus {
-                        Text(connectionStatus)
-                            .font(.caption2)
-                            .foregroundStyle(connectionStatusColor)
-                            .lineLimit(2)
-                    }
-                    Spacer()
+            HStack(alignment: .center, spacing: 10) {
+                Button(remoteSettingsButtonTitle) {
+                    Task { await loadRemoteSettings() }
                 }
-            } else {
-                helperText("本机下载服务由 AriaPilot 自动管理连接和密钥。自己安装的 aria2 请切到远程模式配置。")
+                .disabled(isLoadingRemoteSettings)
+
+                if let connectionStatus {
+                    Text(connectionStatus)
+                        .font(.caption2)
+                        .foregroundStyle(connectionStatusColor)
+                        .lineLimit(2)
+                }
+                Spacer()
             }
         }
     }
@@ -267,6 +205,7 @@ struct SettingsView: View {
     private var localServiceSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("本机下载服务")
+            helperText("RPC 和密钥由 AriaPilot 自动管理。自己安装的 aria2 请切换到远程模式配置。")
 
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -399,6 +338,14 @@ struct SettingsView: View {
             .pickerStyle(.segmented)
 
             helperText(deletePreferenceHelpText)
+        }
+    }
+
+    private var appSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            startupSection
+            Divider()
+            updateSection
         }
     }
 
