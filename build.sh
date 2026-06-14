@@ -15,6 +15,10 @@ ARIA2_VENDOR_BINARY="vendor/aria2/darwin-arm64/aria2c"
 ARIA2_VENDOR_LIB_DIR="vendor/aria2/darwin-arm64/lib"
 ARIA2_RESOURCES="$RESOURCES/aria2"
 
+if [ -x "scripts/prepare_vendor_update.sh" ]; then
+    scripts/prepare_vendor_update.sh
+fi
+
 echo "Building release..."
 swift build -c release 2>&1
 
