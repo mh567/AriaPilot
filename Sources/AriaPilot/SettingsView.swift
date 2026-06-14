@@ -2,6 +2,54 @@ import AppKit
 import SwiftUI
 import ServiceManagement
 
+private enum SettingsPane: String, CaseIterable, Identifiable {
+    case connection
+    case downloads
+    case delete
+    case app
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .connection:
+            return "连接与服务"
+        case .downloads:
+            return "下载参数"
+        case .delete:
+            return "删除策略"
+        case .app:
+            return "应用"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .connection:
+            return "选择本机或远程后端，并管理本机 aria2 服务。"
+        case .downloads:
+            return "设置保存路径、任务并发、连接数和速度限制。"
+        case .delete:
+            return "设置删除任务时的默认处理方式。"
+        case .app:
+            return "管理登录启动和应用更新。"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .connection:
+            return "network"
+        case .downloads:
+            return "arrow.down.circle"
+        case .delete:
+            return "trash"
+        case .app:
+            return "gearshape"
+        }
+    }
+}
+
 struct SettingsView: View {
     @EnvironmentObject var manager: DownloadManager
     var onClose: () -> Void
@@ -19,23 +67,26 @@ struct SettingsView: View {
     @State private var validationError: String?
     @State private var connectionStatus: String?
     @State private var isLoadingRemoteSettings = false
+    @State private var selectedPane: SettingsPane = .connection
     @AppStorage("deleteActionPreference") private var deleteActionPreference = DeleteActionPreference.ask.rawValue
 
     var body: some View {
-        VStack(spacing: 12) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    connectionSection
-                    if connectionMode == .local {
-                        localServiceSection
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 0) {
+                sidebar
+
+                Divider()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        paneHeader
+                        selectedPaneContent
                     }
-                    downloadSection
-                    deletionSection
-                    speedSection
-                    startupSection
-                    updateSection
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+            .frame(minHeight: 500)
 
             if let validationError {
                 HStack(spacing: 6) {
@@ -45,6 +96,9 @@ struct SettingsView: View {
                 }
                 .font(.caption2)
                 .foregroundStyle(.red)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(Color.red.opacity(0.08))
             }
 
             HStack {
@@ -56,9 +110,10 @@ struct SettingsView: View {
                 }
                 .keyboardShortcut(.defaultAction)
             }
+            .padding(16)
+            .background(Color(nsColor: .windowBackgroundColor))
         }
-        .padding(20)
-        .frame(minWidth: 540, minHeight: 500)
+        .frame(minWidth: 720, minHeight: 560)
         .onAppear {
             connectionMode = ConnectionMode(rawValue: manager.connectionMode) ?? .remote
             if connectionMode == .local {
@@ -101,9 +156,114 @@ struct SettingsView: View {
         }
     }
 
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("设置")
+                .font(.headline)
+                .padding(.bottom, 8)
+
+            ForEach(SettingsPane.allCases) { pane in
+                Button {
+                    selectedPane = pane
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: pane.systemImage)
+                            .frame(width: 18)
+                        Text(pane.title)
+                        Spacer()
+                    }
+                    .font(.caption)
+                    .fontWeight(selectedPane == pane ? .semibold : .regular)
+                    .foregroundStyle(selectedPane == pane ? .primary : .secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(selectedPane == pane ? Color.accentColor.opacity(0.14) : Color.clear)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer()
+        }
+        .padding(16)
+        .frame(width: 164)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    private var paneHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(selectedPane.title)
+                .font(.title3)
+                .fontWeight(.semibold)
+            Text(selectedPane.subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var selectedPaneContent: some View {
+        switch selectedPane {
+        case .connection:
+            connectionPane
+        case .downloads:
+            downloadsPane
+        case .delete:
+            deletePane
+        case .app:
+            appPane
+        }
+    }
+
+    private var connectionPane: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            settingsPanel {
+                connectionSection
+            }
+
+            if connectionMode == .local {
+                settingsPanel {
+                    localServiceSection
+                }
+            }
+        }
+    }
+
+    private var downloadsPane: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            settingsPanel {
+                downloadSection
+            }
+
+            settingsPanel {
+                speedSection
+            }
+        }
+    }
+
+    private var deletePane: some View {
+        settingsPanel {
+            deletionSection
+        }
+    }
+
+    private var appPane: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            settingsPanel {
+                startupSection
+            }
+
+            settingsPanel {
+                updateSection
+            }
+        }
+    }
+
     private var connectionSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("连接")
+            sectionHeader("连接方式")
 
             Picker("连接方式", selection: $connectionMode) {
                 Text("本机下载服务").tag(ConnectionMode.local)
@@ -119,7 +279,7 @@ struct SettingsView: View {
                 SecureField("可选", text: $rpcSecret)
                     .textFieldStyle(.roundedBorder)
 
-                HStack {
+                HStack(alignment: .center, spacing: 10) {
                     Button(remoteSettingsButtonTitle) {
                         Task { await loadRemoteSettings() }
                     }
@@ -143,27 +303,33 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("本机下载服务")
 
-            HStack {
-                Text("状态：\(localServiceDisplayTitle)")
-                    .font(.caption)
-                    .foregroundStyle(localServiceStatusColor)
-                if !localService.version.isEmpty {
-                    Text(localService.version)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(localServiceDisplayTitle)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(localServiceStatusColor)
+                    if !localService.version.isEmpty {
+                        Text(localService.version)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    if let message = localService.message {
+                        Text(message)
+                            .font(.caption2)
+                            .foregroundStyle(localServiceStatusColor)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 Spacer()
+                Button("检测服务") {
+                    Task { await localService.refresh() }
+                }
+                .disabled(localService.action != .idle)
             }
 
-            if let message = localService.message {
-                Text(message)
-                    .font(.caption2)
-                    .foregroundStyle(localServiceStatusColor)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            HStack {
+            HStack(spacing: 8) {
                 Button("安装服务") {
                     Task { await installLocalService() }
                 }
@@ -188,47 +354,49 @@ struct SettingsView: View {
                     Task { await localService.uninstall() }
                 }
                 .disabled(!canUninstallLocalService)
-
-                Button("检测服务") {
-                    Task { await localService.refresh() }
-                }
-                .disabled(localService.action != .idle)
             }
         }
     }
 
     private var downloadSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("下载")
+            sectionHeader("下载位置")
 
             fieldLabel(connectionMode == .local ? "本机下载路径" : "服务端下载路径")
-            TextField(downloadDirectoryPlaceholder, text: $downloadDirectory)
-                .textFieldStyle(.roundedBorder)
             if connectionMode == .local {
-                HStack {
-                    helperText("本机下载服务会保存到这个 Mac 上的路径。")
-                    Spacer()
+                HStack(spacing: 8) {
+                    TextField(downloadDirectoryPlaceholder, text: $downloadDirectory)
+                        .textFieldStyle(.roundedBorder)
                     Button("选择") {
                         chooseLocalDownloadDirectory()
                     }
                 }
+                helperText("本机下载服务会保存到这个 Mac 上的路径。")
             } else {
+                TextField(downloadDirectoryPlaceholder, text: $downloadDirectory)
+                    .textFieldStyle(.roundedBorder)
                 helperText("填写 aria2 服务所在机器能访问的路径。远程 aria2 请使用服务端路径，留空则使用 aria2 默认位置。")
             }
 
-            Stepper(
-                "同时下载任务：\(maxConcurrentDownloads)",
-                value: $maxConcurrentDownloads,
-                in: 1...100
-            )
-            .font(.caption)
+            Divider()
+                .padding(.vertical, 4)
 
-            Stepper(
-                "单任务连接数：\(connectionsPerDownload)",
-                value: $connectionsPerDownload,
-                in: 1...64
-            )
-            .font(.caption)
+            sectionHeader("任务参数")
+            HStack(spacing: 18) {
+                Stepper(
+                    "同时下载任务：\(maxConcurrentDownloads)",
+                    value: $maxConcurrentDownloads,
+                    in: 1...100
+                )
+                .font(.caption)
+
+                Stepper(
+                    "单任务连接数：\(connectionsPerDownload)",
+                    value: $connectionsPerDownload,
+                    in: 1...64
+                )
+                .font(.caption)
+            }
         }
     }
 
@@ -236,13 +404,18 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("速度限制")
 
-            fieldLabel("全局下载限速")
-            TextField("0, 500K, 2M", text: $downloadSpeedLimit)
-                .textFieldStyle(.roundedBorder)
-
-            fieldLabel("全局上传限速")
-            TextField("0, 500K, 2M", text: $uploadSpeedLimit)
-                .textFieldStyle(.roundedBorder)
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    fieldLabel("全局下载限速")
+                    TextField("0, 500K, 2M", text: $downloadSpeedLimit)
+                        .textFieldStyle(.roundedBorder)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    fieldLabel("全局上传限速")
+                    TextField("0, 500K, 2M", text: $uploadSpeedLimit)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
 
             helperText("0 表示不限速。例如：500K、2M。")
         }
@@ -257,7 +430,7 @@ struct SettingsView: View {
                     Text(preference.title).tag(preference.rawValue)
                 }
             }
-            .pickerStyle(.menu)
+            .pickerStyle(.segmented)
 
             helperText(deletePreferenceHelpText)
         }
@@ -268,8 +441,9 @@ struct SettingsView: View {
             sectionHeader("启动")
 
             Toggle("登录时启动", isOn: $launchAtLogin)
-                .font(.caption)
                 .onChange(of: launchAtLogin, perform: setLaunchAtLogin)
+
+            helperText("本机下载服务是否随应用启动，由当前保存的连接模式决定。")
         }
     }
 
@@ -277,21 +451,20 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("更新")
 
-            HStack {
-                Text("当前版本：\(updateManager.currentVersion)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("当前版本：\(updateManager.currentVersion)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if let status = updateStatus {
+                        Text(status)
+                            .font(.caption)
+                            .foregroundStyle(updateStatusColor)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
                 Spacer()
-            }
-
-            if let status = updateStatus {
-                Text(status)
-                    .font(.caption)
-                    .foregroundStyle(updateStatusColor)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            HStack {
                 Button(updateButtonTitle) {
                     Task { await updateManager.checkForUpdates() }
                 }
@@ -324,6 +497,18 @@ struct SettingsView: View {
         Text(text)
             .font(.caption2)
             .foregroundStyle(.secondary)
+    }
+
+    private func settingsPanel<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            content()
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private var updateButtonTitle: String {
