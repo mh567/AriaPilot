@@ -20,12 +20,74 @@ class DownloadManager: ObservableObject {
     @AppStorage("downloadSpeedLimit") var downloadSpeedLimit = "0"
     @AppStorage("uploadSpeedLimit") var uploadSpeedLimit = "0"
     @AppStorage("hasSavedDownloadSettings") var hasSavedDownloadSettings = false
+    @AppStorage("connectionMode") var connectionMode = ConnectionMode.remote.rawValue
+    @AppStorage("remoteRPCURL") var remoteRPCURL = ""
+    @AppStorage("remoteRPCSecret") var remoteRPCSecret = ""
+    @AppStorage("remoteDownloadDirectory") var remoteDownloadDirectory = ""
 
     private var timer: Timer?
     private let pageSize = 10
+    private var persistedStoppedDownloads: [Download] = []
+
+    init() {
+        persistedStoppedDownloads = Self.loadDownloadHistory()
+        stoppedDownloads = persistedStoppedDownloads
+    }
 
     var client: Aria2Client {
         Aria2Client(rpcURL: rpcURL, secret: rpcSecret)
+    }
+
+    var savedRemoteRPCURL: String {
+        if !remoteRPCURL.isEmpty {
+            return remoteRPCURL
+        }
+        return Self.isLocalRPCURL(rpcURL) ? "" : rpcURL
+    }
+
+    var savedRemoteRPCSecret: String {
+        remoteRPCSecret.isEmpty && !Self.isLocalRPCURL(rpcURL) ? rpcSecret : remoteRPCSecret
+    }
+
+    var savedRemoteDownloadDirectory: String {
+        remoteDownloadDirectory.isEmpty && !Self.isLocalRPCURL(rpcURL) ? downloadDirectory : remoteDownloadDirectory
+    }
+
+    func saveRemoteConnection(rpcURL: String, rpcSecret: String, downloadDirectory: String) {
+        remoteRPCURL = rpcURL
+        remoteRPCSecret = rpcSecret
+        remoteDownloadDirectory = downloadDirectory
+        self.rpcURL = rpcURL
+        self.rpcSecret = rpcSecret
+        self.downloadDirectory = downloadDirectory
+        connectionMode = ConnectionMode.remote.rawValue
+    }
+
+    func migrateLegacyRemoteConnectionIfNeeded() {
+        guard remoteRPCURL.isEmpty, !Self.isLocalRPCURL(rpcURL) else { return }
+        remoteRPCURL = rpcURL
+        remoteRPCSecret = rpcSecret
+        remoteDownloadDirectory = downloadDirectory
+    }
+
+    func preserveRemoteConnectionIfNeeded(
+        rpcURL: String,
+        rpcSecret: String,
+        downloadDirectory: String
+    ) {
+        let trimmedURL = rpcURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedURL.isEmpty, !Self.isLocalRPCURL(trimmedURL) else { return }
+        remoteRPCURL = trimmedURL
+        remoteRPCSecret = rpcSecret
+        remoteDownloadDirectory = downloadDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func isLocalRPCURL(_ value: String) -> Bool {
+        guard let url = URL(string: value.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let host = url.host?.lowercased() else {
+            return false
+        }
+        return host == "localhost" || host == "127.0.0.1" || host == "::1"
     }
 
     private var currentMenuBarStatus: MenuBarStatus {
@@ -78,7 +140,7 @@ class DownloadManager: ObservableObject {
             activeDownloads = try await active + waiting
             let latestStat = try await stat
             let stopped = try await stoppedPage(total: latestStat.stoppedCount, loadedCount: loadedCount)
-            stoppedDownloads = stopped
+            mergeStoppedDownloads(stopped)
             hasMoreStopped = stopped.count < latestStat.stoppedCount
             globalStat = latestStat
             isConnected = true
@@ -105,8 +167,8 @@ class DownloadManager: ObservableObject {
                 total: total,
                 loadedCount: loadedCount
             )
-            stoppedDownloads = page
-            hasMoreStopped = stoppedDownloads.count < total
+            mergeStoppedDownloads(page)
+            hasMoreStopped = page.count < total
         } catch {
             self.error = error.localizedDescription
             updateMenuBarStatus()
@@ -116,14 +178,35 @@ class DownloadManager: ObservableObject {
 
     // MARK: - Actions
 
-    func addDownload(url: String) async {
+    @discardableResult
+    func addDownload(url: String) async -> Bool {
         do {
+            try await prepareConnectionForUserAction()
             try await client.addUri(url, options: defaultDownloadOptions)
             await refresh()
+            updateMenuBarStatus()
+            return isConnected && error == nil
         } catch {
             self.error = error.localizedDescription
             updateMenuBarStatus()
+            return false
         }
+    }
+
+    private func prepareConnectionForUserAction() async throws {
+        guard ConnectionMode(rawValue: connectionMode) == .local else { return }
+        let localService = LocalAria2ServiceManager()
+        rpcURL = localService.rpcURL
+        rpcSecret = localService.savedSecret
+        if downloadDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            downloadDirectory = localService.savedDownloadDirectory
+        }
+        if isConnected { return }
+        await localService.start()
+        if case .running = localService.status {
+            return
+        }
+        throw LocalAria2ServiceError(localService.message ?? "本机下载服务尚未就绪，请先在设置中安装或启动服务。")
     }
 
     func applyGlobalOptions() async {
@@ -200,16 +283,27 @@ class DownloadManager: ObservableObject {
         }
     }
 
-    func clearHistory() async {
+    func remove(download: Download, deleteFiles: Bool) async {
         do {
-            try await client.purgeDownloadResult()
-            stoppedDownloads = []
-            hasMoreStopped = false
+            try await removeTaskIfPresent(download.gid)
+            if deleteFiles {
+                try deleteDownloadedFiles(for: download)
+            }
+            removeFromHistory(gid: download.gid)
             await refresh()
         } catch {
             self.error = error.localizedDescription
             updateMenuBarStatus()
         }
+    }
+
+    func clearHistory() async {
+        try? await client.purgeDownloadResult()
+        persistedStoppedDownloads = []
+        saveDownloadHistory()
+        stoppedDownloads = []
+        hasMoreStopped = false
+        await refresh()
     }
 
     private var defaultDownloadOptions: [String: String] {
@@ -243,6 +337,116 @@ class DownloadManager: ObservableObject {
         return try await client.tellStopped(offset: -1, num: count)
     }
 
+    private func mergeStoppedDownloads(_ downloads: [Download]) {
+        let durable = downloads.filter { $0.isComplete || $0.isError }
+        var byID = Dictionary(uniqueKeysWithValues: persistedStoppedDownloads.map { ($0.gid, $0) })
+        for download in durable {
+            byID[download.gid] = download
+        }
+        persistedStoppedDownloads = Array(byID.values)
+            .sorted { $0.gid > $1.gid }
+        saveDownloadHistory()
+        stoppedDownloads = mergedStoppedDownloads(live: downloads, history: persistedStoppedDownloads)
+    }
+
+    private func mergedStoppedDownloads(live: [Download], history: [Download]) -> [Download] {
+        var seen = Set<String>()
+        var result: [Download] = []
+        for download in live + history where seen.insert(download.gid).inserted {
+            result.append(download)
+        }
+        return result
+    }
+
+    private func removeTask(_ gid: String) async throws {
+        do {
+            try await client.remove(gid: gid)
+        } catch {
+            try await client.removeResult(gid: gid)
+        }
+    }
+
+    private func removeTaskIfPresent(_ gid: String) async throws {
+        do {
+            try await removeTask(gid)
+        } catch {
+            if isMissingTaskError(error) {
+                return
+            }
+            throw error
+        }
+    }
+
+    private func deleteDownloadedFiles(for download: Download) throws {
+        let paths = Set(
+            (download.files ?? [])
+                .compactMap { $0.localPath }
+                .filter { !$0.isEmpty }
+        )
+        guard !paths.isEmpty else { return }
+
+        var failures: [String] = []
+        for path in paths.sorted() {
+            let url = URL(fileURLWithPath: NSString(string: path).expandingTildeInPath)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                continue
+            }
+            do {
+                var trashedURL: NSURL?
+                try FileManager.default.trashItem(at: url, resultingItemURL: &trashedURL)
+            } catch {
+                failures.append("\((url.path as NSString).lastPathComponent)：\(error.localizedDescription)")
+            }
+        }
+
+        if !failures.isEmpty {
+            throw LocalAria2ServiceError("任务已删除，但部分文件删除失败：\(failures.joined(separator: "；"))")
+        }
+    }
+
+    private func removeFromHistory(gid: String) {
+        persistedStoppedDownloads.removeAll { $0.gid == gid }
+        stoppedDownloads.removeAll { $0.gid == gid }
+        saveDownloadHistory()
+    }
+
+    private func isMissingTaskError(_ error: Error) -> Bool {
+        let message = error.localizedDescription.lowercased()
+        return message.contains("not found") ||
+            message.contains("notfound") ||
+            message.contains("no such") ||
+            message.contains("unknown")
+    }
+
+    private func saveDownloadHistory() {
+        do {
+            let url = Self.downloadHistoryURL
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let data = try JSONEncoder().encode(persistedStoppedDownloads)
+            try data.write(to: url, options: .atomic)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private static func loadDownloadHistory() -> [Download] {
+        do {
+            let data = try Data(contentsOf: downloadHistoryURL)
+            return try JSONDecoder().decode([Download].self, from: data)
+        } catch {
+            return []
+        }
+    }
+
+    private static var downloadHistoryURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("AriaPilot", isDirectory: true)
+            .appendingPathComponent("download-history.json")
+    }
+
     private func positiveInt(_ value: String?, fallback: Int) -> Int {
         guard let value,
               let number = Int(value),
@@ -272,6 +476,25 @@ enum MenuBarStatus: Hashable {
     case waiting
     case paused
     case error
+}
+
+enum DeleteActionPreference: String, CaseIterable, Identifiable {
+    case ask
+    case taskOnly
+    case taskAndFiles
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .ask:
+            return "每次询问"
+        case .taskOnly:
+            return "只删除任务"
+        case .taskAndFiles:
+            return "同时删除文件"
+        }
+    }
 }
 
 struct RemoteAria2Settings {

@@ -114,7 +114,7 @@ struct DownloadsListView: View {
     }
 
     private var completedCount: Int {
-        manager.globalStat?.stoppedCount ?? manager.stoppedDownloads.count
+        manager.stoppedDownloads.count
     }
 
     private var clearHistoryButton: some View {

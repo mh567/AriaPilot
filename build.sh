@@ -2,8 +2,8 @@
 set -e
 
 APP_NAME="AriaPilot"
-APP_VERSION="1.4.2"
-BUILD_NUMBER="142"
+APP_VERSION="1.5.0"
+BUILD_NUMBER="150"
 BUILD_DIR=".build/release"
 APP_BUNDLE="$APP_NAME.app"
 CONTENTS="$APP_BUNDLE/Contents"
@@ -11,6 +11,9 @@ MACOS="$CONTENTS/MacOS"
 RESOURCES="$CONTENTS/Resources"
 ZIP_NAME="$APP_NAME-v$APP_VERSION-macos.zip"
 ICON_FILE="assets/AppIcon.icns"
+ARIA2_VENDOR_BINARY="vendor/aria2/darwin-arm64/aria2c"
+ARIA2_VENDOR_LIB_DIR="vendor/aria2/darwin-arm64/lib"
+ARIA2_RESOURCES="$RESOURCES/aria2"
 
 echo "Building release..."
 swift build -c release 2>&1
@@ -26,6 +29,17 @@ if [ ! -f "$ICON_FILE" ]; then
     exit 1
 fi
 cp "$ICON_FILE" "$RESOURCES/AppIcon.icns"
+if [ -f "$ARIA2_VENDOR_BINARY" ]; then
+    mkdir -p "$ARIA2_RESOURCES"
+    cp "$ARIA2_VENDOR_BINARY" "$ARIA2_RESOURCES/aria2c"
+    chmod 755 "$ARIA2_RESOURCES/aria2c"
+    if [ -d "$ARIA2_VENDOR_LIB_DIR" ]; then
+        cp -R "$ARIA2_VENDOR_LIB_DIR" "$ARIA2_RESOURCES/lib"
+        chmod -R u+rwX,go+rX "$ARIA2_RESOURCES/lib"
+    fi
+else
+    echo "Warning: bundled aria2 backend not found at $ARIA2_VENDOR_BINARY" >&2
+fi
 
 cat > "$CONTENTS/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>

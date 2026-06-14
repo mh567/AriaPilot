@@ -58,9 +58,14 @@ struct Aria2Options: Decodable {
     }
 }
 
+struct Aria2Version: Decodable {
+    let version: String
+    let enabledFeatures: [String]?
+}
+
 // MARK: - Download
 
-struct Download: Identifiable, Decodable {
+struct Download: Identifiable, Codable {
     let gid: String
     let status: String
     let totalLength: String
@@ -116,20 +121,24 @@ struct Download: Identifiable, Decodable {
     var isError: Bool { status == "error" || status == "removed" }
 }
 
-struct FileInfo: Decodable {
+struct FileInfo: Codable {
     let path: String?
     let uris: [URIInfo]?
+
+    var localPath: String? {
+        path?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
-struct URIInfo: Decodable {
+struct URIInfo: Codable {
     let uri: String
 }
 
-struct BTInfo: Decodable {
+struct BTInfo: Codable {
     let info: BTName?
 }
 
-struct BTName: Decodable {
+struct BTName: Codable {
     let name: String?
 }
 

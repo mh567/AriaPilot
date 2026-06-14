@@ -35,16 +35,33 @@ AriaPilot 是一个轻量级 macOS 菜单栏工具，用来查看和管理 aria2
 
 1. 配置 RPC URL 和密钥
 2. 检测 aria2 连接并读取运行配置
-3. 设置新任务默认服务端下载路径
-4. 设置同时下载任务数量
-5. 设置新任务连接数
-6. 设置全局下载和上传速度限制
-7. 配置登录时启动
-8. 检查并安装新版本
+3. 在本机下载服务和远程 aria2 服务之间切换
+4. 安装、启动、重启、停止、卸载和检测本机下载服务
+5. 设置新任务默认服务端下载路径
+6. 设置同时下载任务数量
+7. 设置新任务连接数
+8. 设置全局下载和上传速度限制
+9. 配置登录时启动
+10. 检查并安装新版本
 
 服务端下载路径指 aria2 所在机器能访问的路径。远程 aria2 场景下，请填写服务端路径，例如 `/downloads` 或 `D:\Downloads`。留空时使用 aria2 默认位置。
 
 说明：AriaPilot 的“已完成”列表来自 aria2 RPC 的 `aria2.tellStopped`，它不会扫描下载目录。如果 aria2 没有保留历史结果，列表会显示为空。
+
+## 本机下载服务
+
+AriaPilot 可以管理一个用户级本机 aria2 服务。选择“本机下载服务”只会切换设置界面，不会自动安装、启动或停止服务。本机服务相关动作由“安装服务”“启动”“重启”“停止”“卸载服务”“检测服务”这些按钮完成。
+
+本机服务默认使用：
+
+```text
+RPC URL: http://localhost:6800/jsonrpc
+下载路径: ~/Downloads/AriaPilot
+LaunchAgent: ~/Library/LaunchAgents/com.ariapilot.aria2.plist
+配置目录: ~/Library/Application Support/AriaPilot/aria2
+```
+
+保存按钮只保存当前连接方式和下载设置。保存“本机下载服务”会让客户端连接本机 RPC，但不会自动安装服务；保存“远程 aria2 服务”会让客户端连接远程 RPC，也不会自动停止本机服务。远程配置和本机配置会分开保存，切换模式不会覆盖另一套配置。
 
 ## 安装
 
@@ -112,6 +129,14 @@ bash build.sh
 AriaPilot.app
 AriaPilot-vx.x.x-macos.zip
 ```
+
+发布构建会把下面的内置后端复制进 app bundle：
+
+```text
+vendor/aria2/darwin-arm64/aria2c
+```
+
+官方 aria2 Release 当前没有 macOS ARM64 预编译包。仓库内的 `Update bundled aria2` workflow 会在 macOS ARM runner 上从官方源码编译 `aria2c`，更新 vendor 二进制并创建 PR。
 
 ## 系统要求
 

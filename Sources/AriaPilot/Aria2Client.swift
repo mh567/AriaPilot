@@ -69,7 +69,7 @@ struct Aria2Client {
 
     @discardableResult
     func addUri(_ uri: String, options: [String: String] = [:]) async throws -> String {
-        var params: [RPCParam] = [.arrayOfStrings([[uri]])]
+        var params: [RPCParam] = [.strings([uri])]
         if !options.isEmpty {
             params.append(.options(options))
         }

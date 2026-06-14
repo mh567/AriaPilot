@@ -1,0 +1,116 @@
+name: Update bundled aria2
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "20 3 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-aria2:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve latest aria2 release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$(gh release list --repo aria2/aria2 --limit 1 --json tagName --jq '.[0].tagName')"
+          version="${tag#release-}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Skip unchanged version
+        id: current
+        run: |
+          current=""
+          if [ -f vendor/aria2/VERSION ]; then
+            current="$(cat vendor/aria2/VERSION)"
+          fi
+          echo "version=$current" >> "$GITHUB_OUTPUT"
+
+      - name: Install build dependencies
+        if: steps.current.outputs.version != steps.release.outputs.version
+        run: |
+          brew update
+          brew install autoconf automake libtool pkg-config gettext openssl@3 c-ares sqlite libssh2 expat
+
+      - name: Download source
+        if: steps.current.outputs.version != steps.release.outputs.version
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          curl -L "https://github.com/aria2/aria2/releases/download/$TAG/aria2-$VERSION.tar.xz" -o aria2.tar.xz
+          tar -xf aria2.tar.xz
+
+      - name: Build aria2c
+        if: steps.current.outputs.version != steps.release.outputs.version
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          cd "aria2-$VERSION"
+          export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig:$(brew --prefix libssh2)/lib/pkgconfig:$(brew --prefix c-ares)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix expat)/lib/pkgconfig"
+          ./configure \
+            --disable-dependency-tracking \
+            --without-gnutls \
+            --with-openssl \
+            --without-libxml2 \
+            --with-libexpat \
+            --with-libcares \
+            --with-sqlite3 \
+            --with-libssh2
+          make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Update vendor files
+        if: steps.current.outputs.version != steps.release.outputs.version
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          mkdir -p vendor/aria2/darwin-arm64/lib
+          cp "aria2-$VERSION/src/aria2c" vendor/aria2/darwin-arm64/aria2c
+          chmod 755 vendor/aria2/darwin-arm64/aria2c
+          cp "$(brew --prefix expat)/lib/libexpat.1.dylib" vendor/aria2/darwin-arm64/lib/libexpat.1.dylib
+          cp "$(brew --prefix sqlite)/lib/libsqlite3.dylib" vendor/aria2/darwin-arm64/lib/libsqlite3.dylib
+          cp "$(brew --prefix libssh2)/lib/libssh2.1.dylib" vendor/aria2/darwin-arm64/lib/libssh2.1.dylib
+          cp "$(brew --prefix c-ares)/lib/libcares.2.dylib" vendor/aria2/darwin-arm64/lib/libcares.2.dylib
+          cp "$(brew --prefix openssl@3)/lib/libssl.3.dylib" vendor/aria2/darwin-arm64/lib/libssl.3.dylib
+          cp "$(brew --prefix openssl@3)/lib/libcrypto.3.dylib" vendor/aria2/darwin-arm64/lib/libcrypto.3.dylib
+          chmod 755 vendor/aria2/darwin-arm64/lib/*.dylib
+          install_name_tool \
+            -change "$(brew --prefix expat)/lib/libexpat.1.dylib" "@executable_path/lib/libexpat.1.dylib" \
+            -change "$(brew --prefix sqlite)/lib/libsqlite3.dylib" "@executable_path/lib/libsqlite3.dylib" \
+            -change "$(brew --prefix libssh2)/lib/libssh2.1.dylib" "@executable_path/lib/libssh2.1.dylib" \
+            -change "$(brew --prefix c-ares)/lib/libcares.2.dylib" "@executable_path/lib/libcares.2.dylib" \
+            vendor/aria2/darwin-arm64/aria2c
+          install_name_tool \
+            -change "$(brew --prefix openssl@3)/lib/libssl.3.dylib" "@loader_path/libssl.3.dylib" \
+            -change "$(brew --prefix openssl@3)/lib/libcrypto.3.dylib" "@loader_path/libcrypto.3.dylib" \
+            vendor/aria2/darwin-arm64/lib/libssh2.1.dylib
+          codesign --force --sign - vendor/aria2/darwin-arm64/aria2c vendor/aria2/darwin-arm64/lib/*.dylib
+          vendor/aria2/darwin-arm64/aria2c --version
+          echo "$VERSION" > vendor/aria2/VERSION
+          shasum -a 256 vendor/aria2/darwin-arm64/aria2c vendor/aria2/darwin-arm64/lib/*.dylib > vendor/aria2/SHA256SUMS
+
+      - name: Create pull request
+        if: steps.current.outputs.version != steps.release.outputs.version
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: codex/update-aria2-${{ steps.release.outputs.version }}
+          commit-message: chore: update bundled aria2 to ${{ steps.release.outputs.version }}
+          title: Update bundled aria2 to ${{ steps.release.outputs.version }}
+          body: |
+            Updates the bundled macOS ARM64 aria2c binary from the official aria2 source release.
+
+            Upstream tag: `${{ steps.release.outputs.tag }}`
+          add-paths: |
+            vendor/aria2/darwin-arm64/aria2c
+            vendor/aria2/darwin-arm64/lib/*.dylib
+            vendor/aria2/VERSION
+            vendor/aria2/SHA256SUMS

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import ServiceManagement
 
@@ -5,6 +6,8 @@ struct SettingsView: View {
     @EnvironmentObject var manager: DownloadManager
     var onClose: () -> Void
     @StateObject private var updateManager = UpdateManager()
+    @StateObject private var localService = LocalAria2ServiceManager()
+    @State private var connectionMode: ConnectionMode = .remote
     @State private var rpcURL = ""
     @State private var rpcSecret = ""
     @State private var downloadDirectory = ""
@@ -16,13 +19,18 @@ struct SettingsView: View {
     @State private var validationError: String?
     @State private var connectionStatus: String?
     @State private var isLoadingRemoteSettings = false
+    @AppStorage("deleteActionPreference") private var deleteActionPreference = DeleteActionPreference.ask.rawValue
 
     var body: some View {
         VStack(spacing: 12) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     connectionSection
+                    if connectionMode == .local {
+                        localServiceSection
+                    }
                     downloadSection
+                    deletionSection
                     speedSection
                     startupSection
                     updateSection
@@ -52,14 +60,44 @@ struct SettingsView: View {
         .padding(20)
         .frame(minWidth: 540, minHeight: 500)
         .onAppear {
-            rpcURL = manager.rpcURL
-            rpcSecret = manager.rpcSecret
-            downloadDirectory = manager.downloadDirectory
+            connectionMode = ConnectionMode(rawValue: manager.connectionMode) ?? .remote
+            if connectionMode == .local {
+                rpcURL = localService.rpcURL
+                rpcSecret = localService.savedSecret
+                downloadDirectory = manager.downloadDirectory.isEmpty ?
+                    localService.savedDownloadDirectory :
+                    manager.downloadDirectory
+            } else {
+                rpcURL = manager.savedRemoteRPCURL
+                rpcSecret = manager.savedRemoteRPCSecret
+                downloadDirectory = manager.savedRemoteDownloadDirectory
+            }
             maxConcurrentDownloads = manager.maxConcurrentDownloads
             connectionsPerDownload = manager.connectionsPerDownload
             downloadSpeedLimit = manager.downloadSpeedLimit
             uploadSpeedLimit = manager.uploadSpeedLimit
             launchAtLogin = SMAppService.mainApp.status == .enabled
+            Task { await localService.refresh() }
+        }
+        .onChange(of: connectionMode) { mode in
+            if mode == .local {
+                manager.preserveRemoteConnectionIfNeeded(
+                    rpcURL: rpcURL,
+                    rpcSecret: rpcSecret,
+                    downloadDirectory: downloadDirectory
+                )
+                rpcURL = localService.rpcURL
+                rpcSecret = localService.savedSecret
+                downloadDirectory = localService.savedDownloadDirectory
+            } else {
+                rpcURL = manager.savedRemoteRPCURL
+                rpcSecret = manager.savedRemoteRPCSecret
+                downloadDirectory = manager.savedRemoteDownloadDirectory
+                if deleteActionPreference == DeleteActionPreference.taskAndFiles.rawValue {
+                    deleteActionPreference = DeleteActionPreference.ask.rawValue
+                }
+            }
+            connectionStatus = nil
         }
     }
 
@@ -67,27 +105,94 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("连接")
 
-            fieldLabel("RPC URL")
-            TextField("http://localhost:6800/jsonrpc", text: $rpcURL)
-                .textFieldStyle(.roundedBorder)
+            Picker("连接方式", selection: $connectionMode) {
+                Text("本机下载服务").tag(ConnectionMode.local)
+                Text("远程 aria2 服务").tag(ConnectionMode.remote)
+            }
+            .pickerStyle(.segmented)
 
-            fieldLabel("密钥")
-            SecureField("可选", text: $rpcSecret)
-                .textFieldStyle(.roundedBorder)
+            if connectionMode == .remote {
+                fieldLabel("RPC URL")
+                TextField("http://localhost:6800/jsonrpc", text: $rpcURL)
+                    .textFieldStyle(.roundedBorder)
+                fieldLabel("密钥")
+                SecureField("可选", text: $rpcSecret)
+                    .textFieldStyle(.roundedBorder)
+
+                HStack {
+                    Button(remoteSettingsButtonTitle) {
+                        Task { await loadRemoteSettings() }
+                    }
+                    .disabled(isLoadingRemoteSettings)
+
+                    if let connectionStatus {
+                        Text(connectionStatus)
+                            .font(.caption2)
+                            .foregroundStyle(connectionStatusColor)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                }
+            } else {
+                helperText("本机下载服务由 AriaPilot 自动管理连接和密钥。自己安装的 aria2 请切到远程模式配置。")
+            }
+        }
+    }
+
+    private var localServiceSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("本机下载服务")
 
             HStack {
-                Button(remoteSettingsButtonTitle) {
-                    Task { await loadRemoteSettings() }
-                }
-                .disabled(isLoadingRemoteSettings)
-
-                if let connectionStatus {
-                    Text(connectionStatus)
+                Text("状态：\(localServiceDisplayTitle)")
+                    .font(.caption)
+                    .foregroundStyle(localServiceStatusColor)
+                if !localService.version.isEmpty {
+                    Text(localService.version)
                         .font(.caption2)
-                        .foregroundStyle(connectionStatusColor)
-                        .lineLimit(2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
                 Spacer()
+            }
+
+            if let message = localService.message {
+                Text(message)
+                    .font(.caption2)
+                    .foregroundStyle(localServiceStatusColor)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack {
+                Button("安装服务") {
+                    Task { await installLocalService() }
+                }
+                .disabled(!canInstallLocalService)
+
+                Button("启动") {
+                    Task { await localService.start() }
+                }
+                .disabled(!canStartLocalService)
+
+                Button("重启") {
+                    Task { await restartLocalService() }
+                }
+                .disabled(!canRestartLocalService)
+
+                Button("停止") {
+                    Task { await localService.stop() }
+                }
+                .disabled(!canStopLocalService)
+
+                Button("卸载服务") {
+                    Task { await localService.uninstall() }
+                }
+                .disabled(!canUninstallLocalService)
+
+                Button("检测服务") {
+                    Task { await localService.refresh() }
+                }
+                .disabled(localService.action != .idle)
             }
         }
     }
@@ -96,10 +201,20 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("下载")
 
-            fieldLabel("服务端下载路径")
-            TextField("使用 aria2 默认位置，例如 /downloads 或 D:\\Downloads", text: $downloadDirectory)
+            fieldLabel(connectionMode == .local ? "本机下载路径" : "服务端下载路径")
+            TextField(downloadDirectoryPlaceholder, text: $downloadDirectory)
                 .textFieldStyle(.roundedBorder)
-            helperText("填写 aria2 服务所在机器能访问的路径。远程 aria2 请使用服务端路径，留空则使用 aria2 默认位置。")
+            if connectionMode == .local {
+                HStack {
+                    helperText("本机下载服务会保存到这个 Mac 上的路径。")
+                    Spacer()
+                    Button("选择") {
+                        chooseLocalDownloadDirectory()
+                    }
+                }
+            } else {
+                helperText("填写 aria2 服务所在机器能访问的路径。远程 aria2 请使用服务端路径，留空则使用 aria2 默认位置。")
+            }
 
             Stepper(
                 "同时下载任务：\(maxConcurrentDownloads)",
@@ -130,6 +245,21 @@ struct SettingsView: View {
                 .textFieldStyle(.roundedBorder)
 
             helperText("0 表示不限速。例如：500K、2M。")
+        }
+    }
+
+    private var deletionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("删除")
+
+            Picker("删除默认方式", selection: $deleteActionPreference) {
+                ForEach(deletePreferenceOptions) { preference in
+                    Text(preference.title).tag(preference.rawValue)
+                }
+            }
+            .pickerStyle(.menu)
+
+            helperText(deletePreferenceHelpText)
         }
     }
 
@@ -242,6 +372,77 @@ struct SettingsView: View {
         return connectionStatus.hasPrefix("连接失败") ? .red : .secondary
     }
 
+    private var localServiceStatusColor: Color {
+        if localService.action != .idle {
+            return .secondary
+        }
+        switch localService.status {
+        case .running, .notInstalled, .stopped:
+            return .secondary
+        case .externalService:
+            return .orange
+        case .missingBinary, .unhealthy, .failed:
+            return .red
+        }
+    }
+
+    private var localServiceDisplayTitle: String {
+        localService.action.statusTitle ?? localService.status.title
+    }
+
+    private var canInstallLocalService: Bool {
+        guard localService.action == .idle else { return false }
+        if case .notInstalled = localService.status {
+            return true
+        }
+        return false
+    }
+
+    private var canStartLocalService: Bool {
+        guard localService.action == .idle else { return false }
+        if case .stopped = localService.status {
+            return true
+        }
+        return false
+    }
+
+    private var canRestartLocalService: Bool {
+        guard localService.action == .idle else { return false }
+        switch localService.status {
+        case .running, .unhealthy, .stopped:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var canStopLocalService: Bool {
+        guard localService.action == .idle else { return false }
+        switch localService.status {
+        case .running, .unhealthy:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var canUninstallLocalService: Bool {
+        guard localService.action == .idle else { return false }
+        switch localService.status {
+        case .notInstalled, .missingBinary, .externalService:
+            return false
+        default:
+            return true
+        }
+    }
+
+    private var downloadDirectoryPlaceholder: String {
+        if connectionMode == .local {
+            return localService.defaultDownloadDirectory
+        }
+        return "使用 aria2 默认位置，例如 /downloads 或 D:\\Downloads"
+    }
+
     private var isUpdateBusy: Bool {
         switch updateManager.state {
         case .checking, .downloading, .readyToRestart:
@@ -249,6 +450,37 @@ struct SettingsView: View {
         default:
             return false
         }
+    }
+
+    private var deletePreferenceOptions: [DeleteActionPreference] {
+        if connectionMode == .local {
+            return DeleteActionPreference.allCases
+        }
+        return [.ask, .taskOnly]
+    }
+
+    private var deletePreferenceHelpText: String {
+        if connectionMode == .local {
+            return "本机模式可以同时移除本机文件。选择“每次询问”时，删除前会在任务行内显示选项。"
+        }
+        return "远程模式通过 aria2 JSON-RPC 只能删除任务记录，不能删除远端服务器文件。"
+    }
+
+    private func installLocalService() async {
+        let path = normalizedDownloadDirectory
+        localService.setDownloadDirectory(path)
+        await localService.installAndStart(downloadDirectory: path)
+        guard isLocalServiceRunning else { return }
+        applyLocalConnectionSettings()
+        manager.connectionMode = connectionMode.rawValue
+    }
+
+    private func restartLocalService() async {
+        let path = normalizedDownloadDirectory
+        localService.setDownloadDirectory(path)
+        await localService.restart(downloadDirectory: path)
+        guard isLocalServiceRunning else { return }
+        applyLocalConnectionSettings()
     }
 
     private func loadRemoteSettings(silent: Bool = false) async {
@@ -290,18 +522,58 @@ struct SettingsView: View {
             return
         }
 
-        manager.rpcURL = rpcURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        manager.rpcSecret = rpcSecret
-        manager.downloadDirectory = downloadDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
-        manager.maxConcurrentDownloads = maxConcurrentDownloads
-        manager.connectionsPerDownload = connectionsPerDownload
-        manager.downloadSpeedLimit = downloadSpeedLimit.trimmingCharacters(in: .whitespacesAndNewlines)
-        manager.uploadSpeedLimit = uploadSpeedLimit.trimmingCharacters(in: .whitespacesAndNewlines)
-        manager.hasSavedDownloadSettings = true
-        manager.startPolling(applySavedOptions: false)
         Task {
-            await manager.applyGlobalOptions()
+            if connectionMode == .local {
+                applyLocalConnectionSettings()
+                localService.setDownloadDirectory(normalizedDownloadDirectory)
+            } else {
+                if deleteActionPreference == DeleteActionPreference.taskAndFiles.rawValue {
+                    deleteActionPreference = DeleteActionPreference.ask.rawValue
+                }
+                manager.saveRemoteConnection(
+                    rpcURL: rpcURL.trimmingCharacters(in: .whitespacesAndNewlines),
+                    rpcSecret: rpcSecret,
+                    downloadDirectory: downloadDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            }
+            manager.maxConcurrentDownloads = maxConcurrentDownloads
+            manager.connectionsPerDownload = connectionsPerDownload
+            manager.downloadSpeedLimit = downloadSpeedLimit.trimmingCharacters(in: .whitespacesAndNewlines)
+            manager.uploadSpeedLimit = uploadSpeedLimit.trimmingCharacters(in: .whitespacesAndNewlines)
+            manager.hasSavedDownloadSettings = true
+            manager.startPolling(applySavedOptions: false)
             onClose()
+        }
+    }
+
+    private func applyLocalConnectionSettings() {
+        manager.rpcURL = localService.rpcURL
+        manager.rpcSecret = localService.savedSecret
+        manager.downloadDirectory = normalizedDownloadDirectory
+        manager.connectionMode = ConnectionMode.local.rawValue
+        rpcURL = localService.rpcURL
+    }
+
+    private var normalizedDownloadDirectory: String {
+        let trimmed = downloadDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? localService.defaultDownloadDirectory : trimmed
+    }
+
+    private var isLocalServiceRunning: Bool {
+        if case .running = localService.status {
+            return true
+        }
+        return false
+    }
+
+    private func chooseLocalDownloadDirectory() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        if panel.runModal() == .OK, let url = panel.url {
+            downloadDirectory = url.path
         }
     }
 

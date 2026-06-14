@@ -3,6 +3,10 @@ import SwiftUI
 struct DownloadRowView: View {
     @EnvironmentObject var manager: DownloadManager
     let download: Download
+    @AppStorage("deleteActionPreference") private var deleteActionPreference = DeleteActionPreference.ask.rawValue
+    @State private var showingDeleteOptions = false
+    @State private var deleteFiles = false
+    @State private var rememberDeleteChoice = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -25,6 +29,10 @@ struct DownloadRowView: View {
                 statusLabel
                 Spacer()
                 actionButtons
+            }
+
+            if showingDeleteOptions {
+                deleteOptionsView
             }
         }
         .padding(.horizontal, 12)
@@ -71,11 +79,71 @@ struct DownloadRowView: View {
                 .buttonStyle(.borderless)
             }
 
-            Button { Task { await manager.remove(gid: download.gid) } } label: {
+            Button {
+                handleDeleteTap()
+            } label: {
                 Image(systemName: "xmark")
             }
             .buttonStyle(.borderless)
         }
         .font(.caption)
+    }
+
+    private var deleteOptionsView: some View {
+        HStack(spacing: 10) {
+            if canDeleteFiles {
+                Toggle("同时删除文件", isOn: $deleteFiles)
+                    .toggleStyle(.checkbox)
+            }
+            Toggle("记住本次选择", isOn: $rememberDeleteChoice)
+                .toggleStyle(.checkbox)
+
+            Spacer(minLength: 8)
+
+            Button("取消") {
+                showingDeleteOptions = false
+            }
+            .buttonStyle(.bordered)
+
+            Button("删除", role: .destructive) {
+                confirmDelete(deleteFiles: deleteFiles, remember: rememberDeleteChoice)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.red)
+        }
+        .font(.caption2)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func handleDeleteTap() {
+        let preference = DeleteActionPreference(rawValue: deleteActionPreference) ?? .ask
+        switch preference {
+        case .ask:
+            deleteFiles = false
+            rememberDeleteChoice = false
+            showingDeleteOptions = true
+        case .taskOnly:
+            confirmDelete(deleteFiles: false, remember: false)
+        case .taskAndFiles:
+            confirmDelete(deleteFiles: canDeleteFiles, remember: false)
+        }
+    }
+
+    private func confirmDelete(deleteFiles: Bool, remember: Bool) {
+        let effectiveDeleteFiles = canDeleteFiles && deleteFiles
+        if remember {
+            deleteActionPreference = effectiveDeleteFiles ?
+                DeleteActionPreference.taskAndFiles.rawValue :
+                DeleteActionPreference.taskOnly.rawValue
+        }
+        showingDeleteOptions = false
+        Task { await manager.remove(download: download, deleteFiles: effectiveDeleteFiles) }
+    }
+
+    private var canDeleteFiles: Bool {
+        ConnectionMode(rawValue: manager.connectionMode) == .local
     }
 }

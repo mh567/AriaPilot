@@ -7,8 +7,21 @@ struct AriaPilotApp: App {
 
     init() {
         let manager = DownloadManager()
-        manager.startPolling()
         _manager = StateObject(wrappedValue: manager)
+        Task { @MainActor in
+            let mode = ConnectionMode(rawValue: manager.connectionMode) ?? .remote
+            if mode == .local {
+                let localService = LocalAria2ServiceManager()
+                manager.rpcURL = localService.rpcURL
+                manager.rpcSecret = localService.savedSecret
+                manager.downloadDirectory = localService.savedDownloadDirectory
+                await localService.start()
+            } else {
+                manager.migrateLegacyRemoteConnectionIfNeeded()
+                await LocalAria2ServiceManager().stop()
+            }
+            manager.startPolling()
+        }
     }
 
     var body: some Scene {
