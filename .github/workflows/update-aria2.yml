@@ -1,7 +1,16 @@
 name: Update bundled aria2
 
-on:
+"on":
   workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: "Rebuild even when the bundled version matches upstream"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
   schedule:
     - cron: "20 3 * * 1"
 
@@ -35,14 +44,34 @@ jobs:
           fi
           echo "version=$current" >> "$GITHUB_OUTPUT"
 
+      - name: Decide whether to build
+        id: decision
+        env:
+          FORCE_REBUILD: ${{ github.event.inputs.force_rebuild || 'false' }}
+          CURRENT_VERSION: ${{ steps.current.outputs.version }}
+          LATEST_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          should_build="false"
+          reason="bundled aria2 is already up to date"
+          if [ "$FORCE_REBUILD" = "true" ]; then
+            should_build="true"
+            reason="manual force rebuild requested"
+          elif [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+            should_build="true"
+            reason="upstream aria2 changed from $CURRENT_VERSION to $LATEST_VERSION"
+          fi
+          echo "should_build=$should_build" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+          echo "$reason"
+
       - name: Install build dependencies
-        if: steps.current.outputs.version != steps.release.outputs.version
+        if: steps.decision.outputs.should_build == 'true'
         run: |
           brew update
           brew install autoconf automake libtool pkg-config gettext openssl@3 c-ares sqlite libssh2 expat
 
       - name: Download source
-        if: steps.current.outputs.version != steps.release.outputs.version
+        if: steps.decision.outputs.should_build == 'true'
         env:
           TAG: ${{ steps.release.outputs.tag }}
           VERSION: ${{ steps.release.outputs.version }}
@@ -51,7 +80,7 @@ jobs:
           tar -xf aria2.tar.xz
 
       - name: Build aria2c
-        if: steps.current.outputs.version != steps.release.outputs.version
+        if: steps.decision.outputs.should_build == 'true'
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
@@ -69,7 +98,7 @@ jobs:
           make -j"$(sysctl -n hw.ncpu)"
 
       - name: Update vendor files
-        if: steps.current.outputs.version != steps.release.outputs.version
+        if: steps.decision.outputs.should_build == 'true'
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
@@ -94,12 +123,18 @@ jobs:
             -change "$(brew --prefix openssl@3)/lib/libcrypto.3.dylib" "@loader_path/libcrypto.3.dylib" \
             vendor/aria2/darwin-arm64/lib/libssh2.1.dylib
           codesign --force --sign - vendor/aria2/darwin-arm64/aria2c vendor/aria2/darwin-arm64/lib/*.dylib
-          vendor/aria2/darwin-arm64/aria2c --version
           echo "$VERSION" > vendor/aria2/VERSION
           shasum -a 256 vendor/aria2/darwin-arm64/aria2c vendor/aria2/darwin-arm64/lib/*.dylib > vendor/aria2/SHA256SUMS
 
+      - name: Verify bundled aria2c
+        if: steps.decision.outputs.should_build == 'true'
+        run: |
+          file vendor/aria2/darwin-arm64/aria2c
+          otool -L vendor/aria2/darwin-arm64/aria2c
+          vendor/aria2/darwin-arm64/aria2c --version
+
       - name: Create pull request
-        if: steps.current.outputs.version != steps.release.outputs.version
+        if: steps.decision.outputs.should_build == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           branch: codex/update-aria2-${{ steps.release.outputs.version }}
