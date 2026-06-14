@@ -342,7 +342,7 @@ private enum UpdateError: LocalizedError {
             if let statusCode {
                 return "GitHub 返回了异常响应（HTTP \(statusCode)）。"
             }
-            return "GitHub 返回了异常响应。"
+            return "无法连接 GitHub，请检查网络或代理设置。"
         case .packageMissing:
             return "最新版本中没有找到 macOS 安装包。"
         case .extractedAppMissing:

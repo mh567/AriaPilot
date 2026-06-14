@@ -2,8 +2,8 @@
 set -e
 
 APP_NAME="AriaPilot"
-APP_VERSION="1.5.1"
-BUILD_NUMBER="151"
+APP_VERSION="1.5.2"
+BUILD_NUMBER="152"
 BUILD_DIR=".build/release"
 APP_BUNDLE="$APP_NAME.app"
 CONTENTS="$APP_BUNDLE/Contents"
