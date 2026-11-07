@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>AriaPilot</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="/logo.svg" alt="" width="38" height="38">
+        <div class="brand-text">
+          <strong>AriaPilot</strong>
+          <span>下载管理</span>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="主导航">
+        <button class="nav-item is-active" data-view="active" type="button">
+          <span class="nav-icon" data-icon="download"></span>
+          <span>下载中</span>
+          <span class="badge" id="navActiveCount">0</span>
+        </button>
+        <button class="nav-item" data-view="stopped" type="button">
+          <span class="nav-icon" data-icon="check"></span>
+          <span>已完成</span>
+          <span class="badge ghost" id="navStoppedCount">0</span>
+        </button>
+        <button class="nav-item" data-view="settings" type="button">
+          <span class="nav-icon" data-icon="settings"></span>
+          <span>设置</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="engine-card">
+          <div class="engine-line">
+            <span class="dot" id="engineDot"></span>
+            <span id="engineText">连接中</span>
+          </div>
+          <div class="engine-meta" id="engineMeta">aria2</div>
+        </div>
+        <button class="button primary block" id="sidebarAdd" type="button">
+          <span data-icon="plus"></span> 新建下载
+        </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="stats">
+          <div class="stat">
+            <span>下载</span>
+            <strong id="dlSpeed">0 B/s</strong>
+          </div>
+          <div class="stat">
+            <span>上传</span>
+            <strong id="ulSpeed">0 B/s</strong>
+          </div>
+          <div class="stat">
+            <span>活动</span>
+            <strong id="activeCount">0</strong>
+          </div>
+          <div class="stat">
+            <span>等待</span>
+            <strong id="waitingCount">0</strong>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button class="button ghost icon-only" id="refreshBtn" type="button" title="刷新" aria-label="刷新">
+            <span data-icon="refresh"></span>
+          </button>
+          <button class="button primary" id="topAdd" type="button">
+            <span data-icon="plus"></span> 新建下载
+          </button>
+        </div>
+      </header>
+
+      <div class="warning hidden" id="warningBar"></div>
+
+      <section class="view" id="view-active">
+        <div class="section-head">
+          <div>
+            <h1>下载中</h1>
+            <p class="muted" id="activeSummary">正在读取任务</p>
+          </div>
+        </div>
+        <div class="task-list" id="activeList"></div>
+      </section>
+
+      <section class="view hidden" id="view-stopped">
+        <div class="section-head">
+          <div>
+            <h1>已完成</h1>
+            <p class="muted" id="stoppedSummary">完成的下载会保留在这里</p>
+          </div>
+          <button class="button ghost" id="purgeBtn" type="button">清空记录</button>
+        </div>
+        <div class="task-list" id="stoppedList"></div>
+        <div class="load-more hidden" id="loadMoreWrap">
+          <button class="button ghost" id="loadMoreBtn" type="button">加载更多</button>
+        </div>
+      </section>
+
+      <section class="view hidden" id="view-settings">
+        <div class="section-head">
+          <div>
+            <h1>设置</h1>
+            <p class="muted">下载目录、性能与引擎配置</p>
+          </div>
+        </div>
+
+        <form id="settingsForm" class="settings">
+          <div class="card">
+            <div class="card-head">
+              <h2>下载目录</h2>
+              <span class="muted">决定新任务的保存位置</span>
+            </div>
+            <div class="field">
+              <label for="settingDir">保存到</label>
+              <div class="input-row">
+                <input type="text" id="settingDir" spellcheck="false" placeholder="/vol1/downloads">
+                <button class="button ghost" type="button" id="browseSettingDir">浏览</button>
+              </div>
+              <p class="hint" id="dirHint">只能选择已授权的目录。</p>
+            </div>
+            <div class="roots" id="rootsList"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>下载性能</h2>
+              <span class="muted">对内置 aria2 生效</span>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label for="settingConcurrent">并发任务数</label>
+                <input type="number" id="settingConcurrent" min="1" max="50" step="1">
+              </div>
+              <div class="field">
+                <label for="settingConnections">每任务连接数</label>
+                <input type="number" id="settingConnections" min="1" max="64" step="1">
+              </div>
+              <div class="field">
+                <label for="settingSplit">分片数</label>
+                <input type="number" id="settingSplit" min="1" max="64" step="1">
+              </div>
+              <div class="field">
+                <label for="settingDownloadLimit">下载限速</label>
+                <input type="text" id="settingDownloadLimit" spellcheck="false" placeholder="0 或 500K、2M">
+              </div>
+              <div class="field">
+                <label for="settingUploadLimit">上传限速</label>
+                <input type="text" id="settingUploadLimit" spellcheck="false" placeholder="0 或 500K、2M">
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>下载引擎</h2>
+              <span class="muted">默认使用应用自带的 aria2</span>
+            </div>
+            <div class="segmented" role="radiogroup" aria-label="引擎模式">
+              <button type="button" class="segment is-active" data-mode="builtin">内置引擎</button>
+              <button type="button" class="segment" data-mode="external">连接已有 aria2</button>
+            </div>
+
+            <div id="builtinPanel">
+              <div class="grid-2">
+                <div class="field">
+                  <label for="settingPort">RPC 端口</label>
+                  <input type="number" id="settingPort" min="1024" max="65535" step="1">
+                  <p class="hint">仅监听 127.0.0.1，密钥自动生成。</p>
+                </div>
+                <div class="field">
+                  <label>引擎状态</label>
+                  <div class="readonly" id="engineDetail">读取中</div>
+                </div>
+              </div>
+              <div class="inline-actions">
+                <button class="button ghost" type="button" id="restartEngineBtn">重启引擎</button>
+                <button class="button ghost" type="button" id="showLogBtn">查看日志</button>
+              </div>
+            </div>
+
+            <div id="externalPanel" class="hidden">
+              <div class="field">
+                <label for="settingExternalUrl">RPC 地址</label>
+                <input type="text" id="settingExternalUrl" spellcheck="false" placeholder="http://127.0.0.1:6800/jsonrpc">
+              </div>
+              <div class="field">
+                <label for="settingExternalSecret">RPC 密钥</label>
+                <input type="password" id="settingExternalSecret" autocomplete="off" placeholder="留空表示不修改">
+                <p class="hint">外部模式下不支持删除远端文件和浏览远端目录。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2>行为</h2>
+            </div>
+            <label class="switch-row">
+              <span>
+                <strong>删除任务时同时删除文件</strong>
+                <small>作为删除确认框的默认选项</small>
+              </span>
+              <input type="checkbox" id="settingDeleteFiles">
+            </label>
+          </div>
+
+          <div class="settings-actions">
+            <button class="button primary" type="submit" id="saveSettingsBtn">保存设置</button>
+            <span class="muted" id="settingsStatus"></span>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <nav class="mobile-nav" aria-label="移动端导航">
+    <button class="nav-item is-active" data-view="active" type="button">
+      <span class="nav-icon" data-icon="download"></span><span>下载中</span>
+    </button>
+    <button class="nav-item" data-view="stopped" type="button">
+      <span class="nav-icon" data-icon="check"></span><span>已完成</span>
+    </button>
+    <button class="nav-item" data-view="settings" type="button">
+      <span class="nav-icon" data-icon="settings"></span><span>设置</span>
+    </button>
+    <button class="nav-item" id="mobileAdd" type="button">
+      <span class="nav-icon" data-icon="plus"></span><span>新建</span>
+    </button>
+  </nav>
+
+  <div class="modal hidden" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+    <div class="modal-card">
+      <header class="modal-head">
+        <h2 id="addTitle">新建下载</h2>
+        <button class="button ghost icon-only" type="button" data-close="addModal" aria-label="关闭">
+          <span data-icon="x"></span>
+        </button>
+      </header>
+      <div class="modal-body">
+        <div class="field">
+          <label for="addUris">下载链接</label>
+          <textarea id="addUris" rows="4" spellcheck="false" placeholder="每行一个 HTTP、HTTPS 或磁力链接"></textarea>
+          <p class="hint">支持 HTTP、HTTPS、FTP 与磁力链接，可一次添加多条。</p>
+        </div>
+        <div class="field">
+          <label for="addTorrent">种子文件</label>
+          <input type="file" id="addTorrent" accept=".torrent,application/x-bittorrent">
+          <p class="hint" id="torrentHint">可选，与上面的链接二选一或同时使用。</p>
+        </div>
+        <div class="field">
+          <label for="addDir">保存目录</label>
+          <div class="input-row">
+            <input type="text" id="addDir" spellcheck="false" placeholder="使用设置中的默认目录">
+            <button class="button ghost" type="button" id="browseAddDir">浏览</button>
+          </div>
+        </div>
+      </div>
+      <footer class="modal-foot">
+        <button class="button ghost" type="button" data-close="addModal">取消</button>
+        <button class="button primary" type="button" id="submitAdd">开始下载</button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+    <div class="modal-card compact">
+      <header class="modal-head">
+        <h2 id="deleteTitle">删除任务</h2>
+        <button class="button ghost icon-only" type="button" data-close="deleteModal" aria-label="关闭">
+          <span data-icon="x"></span>
+        </button>
+      </header>
+      <div class="modal-body">
+        <p id="deleteTaskName" class="delete-name"></p>
+        <label class="switch-row" id="deleteFilesRow">
+          <span>
+            <strong>同时删除已下载文件</strong>
+            <small>删除后无法恢复</small>
+          </span>
+          <input type="checkbox" id="deleteFiles">
+        </label>
+        <p class="hint hidden" id="deleteFilesHint">外部 aria2 模式下不会删除远端文件。</p>
+      </div>
+      <footer class="modal-foot">
+        <button class="button ghost" type="button" data-close="deleteModal">取消</button>
+        <button class="button danger" type="button" id="confirmDelete">删除</button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="browseModal" role="dialog" aria-modal="true" aria-labelledby="browseTitle">
+    <div class="modal-card">
+      <header class="modal-head">
+        <h2 id="browseTitle">选择目录</h2>
+        <button class="button ghost icon-only" type="button" data-close="browseModal" aria-label="关闭">
+          <span data-icon="x"></span>
+        </button>
+      </header>
+      <div class="modal-body">
+        <div class="browse-bar">
+          <button class="button ghost icon-only" type="button" id="browseUp" aria-label="上一级">
+            <span data-icon="up"></span>
+          </button>
+          <code id="browsePath">/</code>
+        </div>
+        <div class="browse-roots" id="browseRoots"></div>
+        <div class="browse-list" id="browseList"></div>
+      </div>
+      <footer class="modal-foot">
+        <button class="button ghost" type="button" data-close="browseModal">取消</button>
+        <button class="button primary" type="button" id="browseSelect">选择此目录</button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="logModal" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+    <div class="modal-card">
+      <header class="modal-head">
+        <h2 id="logTitle">aria2 日志</h2>
+        <button class="button ghost icon-only" type="button" data-close="logModal" aria-label="关闭">
+          <span data-icon="x"></span>
+        </button>
+      </header>
+      <div class="modal-body">
+        <p class="hint" id="logPath"></p>
+        <pre class="log-view" id="logContent"></pre>
+      </div>
+      <footer class="modal-foot">
+        <button class="button ghost" type="button" data-close="logModal">关闭</button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

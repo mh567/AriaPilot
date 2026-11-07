@@ -1,0 +1,33 @@
+[
+  {
+    "stepTitle": "卸载 AriaPilot",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "已下载的文件不会被删除，请按需自行清理下载目录。"
+      },
+      {
+        "type": "radio",
+        "field": "wizard_delete_data",
+        "label": "应用数据",
+        "initValue": "keep",
+        "options": [
+          {
+            "label": "保留任务记录与下载会话",
+            "value": "keep"
+          },
+          {
+            "label": "删除任务记录与下载会话",
+            "value": "delete"
+          }
+        ],
+        "rules": [
+          {
+            "required": true,
+            "message": "请选择应用数据的处理方式"
+          }
+        ]
+      }
+    ]
+  }
+]

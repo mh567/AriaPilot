@@ -34,3 +34,8 @@ Package.resolved
 .idea/
 # Generated icon intermediates
 assets/AppIcon.iconset/
+
+# fnOS build artifacts
+dist/
+fnos/build/
+.tools/

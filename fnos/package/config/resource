@@ -1,0 +1,12 @@
+{
+  "data-share": {
+    "shares": [
+      {
+        "name": "ariapilot/downloads",
+        "permission": {
+          "rw": ["ariapilot"]
+        }
+      }
+    ]
+  }
+}

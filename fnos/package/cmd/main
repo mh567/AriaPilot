@@ -1,0 +1,164 @@
+#!/bin/bash
+set -u
+
+APP_ENTRY="${TRIM_APPDEST}/server/index.js"
+NODE_BIN="/var/apps/nodejs_v22/target/bin/node"
+LOG_DIR="${TRIM_PKGVAR}/logs"
+LOG_FILE="${LOG_DIR}/app.log"
+PID_FILE="${TRIM_PKGVAR}/app.pid"
+AUTH_FILE="${TRIM_PKGVAR}/auth_paths"
+SERVICE_PORT="${TRIM_SERVICE_PORT:-7788}"
+
+mkdir -p "$LOG_DIR" "${TRIM_PKGVAR}/aria2" "${TRIM_PKGETC}" 2>/dev/null || true
+
+log_msg() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE" 2>/dev/null
+}
+
+report_error() {
+    log_msg "$1"
+    if [ -n "${TRIM_TEMP_LOGFILE:-}" ]; then
+        echo "$1" > "$TRIM_TEMP_LOGFILE"
+    fi
+}
+
+resolve_node() {
+    if [ -x "$NODE_BIN" ]; then
+        echo "$NODE_BIN"
+        return 0
+    fi
+    command -v node 2>/dev/null && return 0
+    return 1
+}
+
+find_orphans() {
+    pgrep -f "$APP_ENTRY" 2>/dev/null || true
+}
+
+check_process() {
+    kill -0 "$1" 2>/dev/null
+}
+
+status() {
+    if [ -r "$PID_FILE" ]; then
+        local pid
+        pid=$(head -n 1 "$PID_FILE" | tr -d '[:space:]')
+        if [ -n "$pid" ] && check_process "$pid"; then
+            return 0
+        fi
+        rm -f "$PID_FILE"
+    fi
+
+    if [ -n "$(find_orphans)" ]; then
+        return 0
+    fi
+
+    return 1
+}
+
+start_process() {
+    if status; then
+        return 0
+    fi
+
+    local node
+    node=$(resolve_node) || {
+        report_error "未找到 Node.js 运行时，请确认 nodejs_v22 已安装"
+        return 1
+    }
+
+    if [ ! -f "$APP_ENTRY" ]; then
+        report_error "应用文件缺失：$APP_ENTRY"
+        return 1
+    fi
+
+    if [ -n "${TRIM_DATA_ACCESSIBLE_PATHS+x}" ]; then
+        printf '%s' "$TRIM_DATA_ACCESSIBLE_PATHS" > "$AUTH_FILE" 2>/dev/null || true
+    fi
+
+    export PATH="/var/apps/nodejs_v22/target/bin:${PATH}"
+    export AP_AUTH_PATHS="${TRIM_DATA_ACCESSIBLE_PATHS:-}"
+    export AP_SHARE_PATHS="${TRIM_DATA_SHARE_PATHS:-}"
+
+    log_msg "启动 AriaPilot（端口 ${SERVICE_PORT}）"
+    "$node" "$APP_ENTRY" >> "$LOG_FILE" 2>&1 &
+    local pid=$!
+    printf '%s' "$pid" > "$PID_FILE"
+
+    local attempt
+    for attempt in 1 2 3 4 5; do
+        if ! check_process "$pid"; then
+            report_error "AriaPilot 启动后立即退出，请查看 ${LOG_FILE}"
+            rm -f "$PID_FILE"
+            return 1
+        fi
+        if (exec 3<>"/dev/tcp/127.0.0.1/${SERVICE_PORT}") 2>/dev/null; then
+            log_msg "AriaPilot 已启动，pid=${pid}"
+            return 0
+        fi
+        sleep 1
+    done
+
+    log_msg "AriaPilot 进程仍在运行，端口暂未就绪，pid=${pid}"
+    return 0
+}
+
+stop_process() {
+    local pid=""
+
+    if [ -r "$PID_FILE" ]; then
+        pid=$(head -n 1 "$PID_FILE" | tr -d '[:space:]')
+    fi
+
+    if [ -n "$pid" ] && check_process "$pid"; then
+        log_msg "停止 AriaPilot，pid=${pid}"
+        kill -TERM "$pid" 2>/dev/null || true
+
+        local count=0
+        while check_process "$pid" && [ "$count" -lt 12 ]; do
+            sleep 1
+            count=$((count + 1))
+        done
+
+        if check_process "$pid"; then
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    fi
+
+    local orphans
+    orphans=$(find_orphans)
+    if [ -n "$orphans" ]; then
+        for pid in $orphans; do
+            [ "$pid" = "$$" ] && continue
+            kill -TERM "$pid" 2>/dev/null || true
+        done
+        sleep 1
+        for pid in $(find_orphans); do
+            kill -KILL "$pid" 2>/dev/null || true
+        done
+    fi
+
+    rm -f "$PID_FILE"
+    return 0
+}
+
+case "${1:-}" in
+start)
+    start_process
+    exit $?
+    ;;
+stop)
+    stop_process
+    exit $?
+    ;;
+status)
+    if status; then
+        exit 0
+    fi
+    exit 3
+    ;;
+*)
+    echo "usage: $0 {start|stop|status}" >&2
+    exit 1
+    ;;
+esac

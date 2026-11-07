@@ -1,0 +1,10 @@
+#!/bin/bash
+set -u
+
+mkdir -p "${TRIM_PKGVAR}" 2>/dev/null || true
+
+if [ -f "${TRIM_PKGVAR}/settings.json" ]; then
+    cp -f "${TRIM_PKGVAR}/settings.json" "${TRIM_PKGVAR}/settings.json.bak" 2>/dev/null || true
+fi
+
+exit 0

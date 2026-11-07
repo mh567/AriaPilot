@@ -1,0 +1,13 @@
+#!/bin/bash
+set -u
+
+if [ "${wizard_delete_data:-keep}" = "delete" ]; then
+    rm -rf "${TRIM_PKGVAR}/aria2" 2>/dev/null || true
+    rm -f "${TRIM_PKGVAR}/history.json" 2>/dev/null || true
+    rm -f "${TRIM_PKGVAR}/settings.json" 2>/dev/null || true
+    rm -f "${TRIM_PKGVAR}/settings.json.bak" 2>/dev/null || true
+    rm -f "${TRIM_PKGVAR}/settings.json.prev" 2>/dev/null || true
+    rm -f "${TRIM_PKGVAR}/auth_paths" 2>/dev/null || true
+fi
+
+exit 0

@@ -1,0 +1,15 @@
+[
+  {
+    "stepTitle": "安装 AriaPilot",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "AriaPilot 会安装独立的 aria2 引擎，与飞牛自带下载中心互不影响。"
+      },
+      {
+        "type": "tips",
+        "helpText": "默认下载目录是应用共享目录。安装完成后可在应用内选择其他已授权目录。"
+      }
+    ]
+  }
+]

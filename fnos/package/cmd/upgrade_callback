@@ -1,0 +1,26 @@
+#!/bin/bash
+set -u
+
+NODE_BIN="/var/apps/nodejs_v22/target/bin/node"
+ARIA2_BIN="${TRIM_APPDEST}/bin/aria2/aria2c"
+SETTINGS="${TRIM_PKGVAR}/settings.json"
+BACKUP="${TRIM_PKGVAR}/settings.json.bak"
+
+if [ -f "$BACKUP" ]; then
+    if [ -f "$SETTINGS" ]; then
+        if ! "$NODE_BIN" -e "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8'))" "$SETTINGS" >/dev/null 2>&1; then
+            cp -f "$BACKUP" "$SETTINGS" 2>/dev/null || true
+        fi
+    else
+        cp -f "$BACKUP" "$SETTINGS" 2>/dev/null || true
+    fi
+    rm -f "$BACKUP"
+fi
+
+chmod 755 "$ARIA2_BIN" 2>/dev/null || true
+if [ -n "${TRIM_DATA_ACCESSIBLE_PATHS+x}" ]; then
+    printf '%s' "$TRIM_DATA_ACCESSIBLE_PATHS" > "${TRIM_PKGVAR}/auth_paths" 2>/dev/null || true
+    chmod 644 "${TRIM_PKGVAR}/auth_paths" 2>/dev/null || true
+fi
+
+exit 0

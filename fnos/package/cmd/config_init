@@ -1,0 +1,8 @@
+#!/bin/bash
+set -u
+
+if [ -f "${TRIM_PKGVAR}/settings.json" ]; then
+    cp -f "${TRIM_PKGVAR}/settings.json" "${TRIM_PKGVAR}/settings.json.prev" 2>/dev/null || true
+fi
+
+exit 0

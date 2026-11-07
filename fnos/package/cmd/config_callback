@@ -1,0 +1,11 @@
+#!/bin/bash
+set -u
+
+mkdir -p "${TRIM_PKGVAR}" 2>/dev/null || true
+if [ -n "${TRIM_DATA_ACCESSIBLE_PATHS+x}" ]; then
+    printf '%s' "$TRIM_DATA_ACCESSIBLE_PATHS" > "${TRIM_PKGVAR}/auth_paths" 2>/dev/null || true
+    chmod 644 "${TRIM_PKGVAR}/auth_paths" 2>/dev/null || true
+fi
+rm -f "${TRIM_PKGVAR}/settings.json.prev" 2>/dev/null || true
+
+exit 0

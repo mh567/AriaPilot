@@ -1,0 +1,17 @@
+appname               = ariapilot
+version               = 1.0.7
+display_name          = AriaPilot
+desc                  = 基于 aria2 的下载管理器，支持 HTTP、BT 与磁力链接，可管理任务、查看实时进度并配置下载目录。
+platform              = x86
+source                = thirdparty
+maintainer            = AriaPilot
+maintainer_url        = https://github.com/mh567/AriaPilot
+distributor           = AriaPilot
+distributor_url       = https://github.com/mh567/AriaPilot
+os_min_version        = 1.1.8
+desktop_uidir         = ui
+desktop_applaunchname = ariapilot.main
+service_port          = 7788
+checkport             = true
+install_dep_apps      = nodejs_v22
+changelog             = 1.0.7：修正桌面图标资源路径，补齐管理员入口的可见性配置。

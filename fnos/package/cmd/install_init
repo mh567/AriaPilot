@@ -1,0 +1,11 @@
+#!/bin/bash
+set -u
+
+NODE_BIN="/var/apps/nodejs_v22/target/bin/node"
+
+if [ ! -x "$NODE_BIN" ] && ! command -v node >/dev/null 2>&1; then
+    echo "未安装 Node.js 运行时 nodejs_v22，无法继续安装 AriaPilot。" > "${TRIM_TEMP_LOGFILE:-/dev/stderr}"
+    exit 1
+fi
+
+exit 0

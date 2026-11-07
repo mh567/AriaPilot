@@ -32,6 +32,16 @@ AriaPilot 支持两类连接模式：
 
 详细安装、配置和使用说明见 [使用说明](docs/USER_GUIDE.md)。
 
+## fnOS 版本
+
+仓库内的 `fnos/` 提供飞牛 fnOS 版本的 Web 应用与 FPK 打包脚本。它自带独立的 aria2 引擎，支持任务管理、实时进度、下载目录与常用配置。
+
+```bash
+bash scripts/build_fpk.sh --arch all
+```
+
+产物为 `dist/ariapilot_1.0.7_x86.fpk` 与 `dist/ariapilot_1.0.7_arm.fpk`。可从 [fnOS v1.0.7 发布页](https://github.com/mh567/AriaPilot/releases/tag/fnos-v1.0.7) 下载。安装、配置和排障说明见 [fnOS 使用说明](docs/FNOS.md)。
+
 ## 系统要求
 
 1. macOS 13.0 或更高版本
