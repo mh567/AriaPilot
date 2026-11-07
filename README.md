@@ -32,6 +32,10 @@ AriaPilot 支持两类连接模式：
 
 详细安装、配置和使用说明见 [使用说明](docs/USER_GUIDE.md)。
 
+## fnOS 版本
+
+飞牛 fnOS 版本已迁移到独立仓库：[mh567/AriaPilot-fnos](https://github.com/mh567/AriaPilot-fnos)。安装包和 fnOS 专用文档在该仓库维护。
+
 ## 系统要求
 
 1. macOS 13.0 或更高版本
